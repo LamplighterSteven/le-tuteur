@@ -1719,10 +1719,32 @@ function startConv(container, topic, style) {
   async function playTTS(text) {
     setStatus('playing');
     try {
+      // Fetch TTS audio
       const audioBlob = await openaiTTS(text);
       const url = URL.createObjectURL(audioBlob);
       currentAudio = new Audio(url);
-      await new Promise(res => { currentAudio.onended = res; currentAudio.onerror = res; currentAudio.play(); });
+      currentAudio.preload = 'auto';
+
+      await new Promise((resolve, reject) => {
+        currentAudio.onended = resolve;
+        currentAudio.onerror = reject;
+        // Explicitly handle the play() promise — critical for iOS Safari
+        const playPromise = currentAudio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(err => {
+            // iOS suspended audio context — try to resume via user gesture workaround
+            console.warn('play() rejected:', err.message);
+            // Re-attempt once
+            setTimeout(() => {
+              currentAudio.play().catch(e => {
+                console.warn('Retry play failed:', e.message);
+                resolve(); // give up gracefully, don't block
+              });
+            }, 100);
+          });
+        }
+      });
+
       URL.revokeObjectURL(url);
       currentAudio = null;
     } catch(e) { console.warn('TTS failed:', e.message); }
@@ -1734,8 +1756,12 @@ function startConv(container, topic, style) {
     addMessage('user', userText);
     const history = messages.map(m=>({role:m.role==='assistant'?'assistant':'user', content:m.text}));
     try {
-      const reply = await callClaude(history, convSystemStyled(topic, style), 300);
+      // Fetch TTS in parallel with Claude response to minimise delay
+      const replyPromise = callClaude(history, convSystemStyled(topic, style), 300);
+      const reply = await replyPromise;
       addMessage('assistant', reply);
+      // Small yield to let the DOM update before starting audio
+      await new Promise(r => setTimeout(r, 50));
       await playTTS(reply);
     } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
   }
