@@ -227,6 +227,7 @@
       </div>
       <div class="flex gap-8 items-center">
         <div class="flex gap-8" id="level-btns"></div>
+        <button class="btn-secondary" id="progress-btn" style="font-size:16px;margin-right:2px" title="Progress">📊</button>
         <button class="btn-secondary" id="settings-btn" style="font-size:16px">⚙</button>
       </div>
     </div>
@@ -234,10 +235,11 @@
   </div>
 
   <!-- SCREENS -->
-  <div id="screen-setup"   class="hidden"></div>
-  <div id="screen-home"    class="hidden"></div>
-  <div id="screen-mode"    class="hidden"></div>
+  <div id="screen-setup"    class="hidden"></div>
+  <div id="screen-home"     class="hidden"></div>
+  <div id="screen-mode"     class="hidden"></div>
   <div id="screen-settings" class="hidden"></div>
+  <div id="screen-progress" class="hidden"></div>
 </div>
 
 <script>
@@ -258,6 +260,96 @@ const STATE = {
 };
 
 function save(key, val) { localStorage.setItem(key, typeof val === 'object' ? JSON.stringify(val) : String(val)); }
+
+// ═══════════════════════════════════════════════════════════════
+// PROGRESS TRACKING ENGINE
+// ═══════════════════════════════════════════════════════════════
+const PROGRESS_KEY = 'lt_progress_v1';
+
+function loadProgress() {
+  try { return JSON.parse(localStorage.getItem(PROGRESS_KEY) || '{"days":{},"drillStats":{}}'); }
+  catch { return { days:{}, drillStats:{} }; }
+}
+
+function saveProgress(p) { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); }
+
+function todayKey() { return new Date().toISOString().slice(0,10); }
+
+function trackDrill(drillTypeId, correct, score, max) {
+  const p = loadProgress();
+  const day = todayKey();
+  if (!p.days[day]) p.days[day] = { drills:0, drillCorrect:0, translation:0, translationScore:0, reading:0, readingScore:0, freewrite:0, freewriteScore:0, conversation:0 };
+  p.days[day].drills++;
+  if (correct) p.days[day].drillCorrect++;
+
+  if (!p.drillStats[drillTypeId]) p.drillStats[drillTypeId] = { attempts:0, correct:0, totalScore:0, maxScore:0 };
+  p.drillStats[drillTypeId].attempts++;
+  if (correct) p.drillStats[drillTypeId].correct++;
+  p.drillStats[drillTypeId].totalScore += score;
+  p.drillStats[drillTypeId].maxScore   += max;
+  saveProgress(p);
+}
+
+function trackMode(mode, score, max) {
+  const p = loadProgress();
+  const day = todayKey();
+  if (!p.days[day]) p.days[day] = { drills:0, drillCorrect:0, translation:0, translationScore:0, reading:0, readingScore:0, freewrite:0, freewriteScore:0, conversation:0 };
+  if (mode === 'translation') { p.days[day].translation++; p.days[day].translationScore = (p.days[day].translationScore||0) + score; }
+  if (mode === 'reading')     { p.days[day].reading++;     p.days[day].readingScore     = (p.days[day].readingScore||0)     + score; }
+  if (mode === 'freewrite')   { p.days[day].freewrite++;   p.days[day].freewriteScore   = (p.days[day].freewriteScore||0)   + score; }
+  if (mode === 'conversation'){ p.days[day].conversation++; }
+  saveProgress(p);
+}
+
+// Returns array of drill type IDs sorted weakest first (min 3 attempts to qualify)
+function getWeakDrillTypes() {
+  const p = loadProgress();
+  return DRILL_TYPES
+    .filter(d => p.drillStats[d.id] && p.drillStats[d.id].attempts >= 3)
+    .map(d => ({ id: d.id, pct: p.drillStats[d.id].correct / p.drillStats[d.id].attempts }))
+    .sort((a,b) => a.pct - b.pct)
+    .map(x => x.id);
+}
+
+// Weighted random type selection — weak types get 3x weight
+function pickWeightedTypes(count) {
+  const weak = getWeakDrillTypes().slice(0, 4);
+  const all = DRILL_TYPES.map(d => d.id);
+  const pool = [];
+  all.forEach(id => {
+    const weight = weak.includes(id) ? 3 : 1;
+    for (let i=0; i<weight; i++) pool.push(id);
+  });
+  const result = [];
+  for (let i=0; i<count; i++) result.push(pool[Math.floor(Math.random()*pool.length)]);
+  return result;
+}
+
+// Streak calculation
+function calcStreak() {
+  const p = loadProgress();
+  const days = Object.keys(p.days).sort().reverse();
+  if (!days.length) return 0;
+  const today = todayKey();
+  let streak = 0;
+  let check = today;
+  for (const d of days) {
+    if (d === check) { streak++; check = prevDay(check); }
+    else if (d < check) break;
+  }
+  return streak;
+}
+
+function prevDay(dateStr) {
+  const d = new Date(dateStr);
+  d.setDate(d.getDate()-1);
+  return d.toISOString().slice(0,10);
+}
+
+function totalSessions() {
+  const p = loadProgress();
+  return Object.values(p.days).reduce((sum,d) => sum + (d.drills||0) + (d.translation||0) + (d.reading||0) + (d.freewrite||0) + (d.conversation||0), 0);
+}
 
 // ═══════════════════════════════════════════════════════════════
 // CONSTANTS
@@ -298,6 +390,7 @@ const MODES = [
   { id:'reading',      label:'Reading',         icon:'📖', desc:'Passages with comprehension questions' },
   { id:'conversation', label:'Conversation',    icon:'🎙', desc:'Speak back and forth in French — microphone required' },
 ];
+// Note: Progress is accessed via the 📊 header button, not as a mode card
 
 const PRONOUNS = ['je','tu','il/elle','nous','vous','ils/elles'];
 
@@ -529,7 +622,7 @@ Return JSON: {"type":"verb_pattern","instruction":"Does this verb take à, de, o
 function el(id) { return document.getElementById(id); }
 function show(id) { el(id).classList.remove('hidden'); }
 function hide(id) { el(id).classList.add('hidden'); }
-function showOnly(id) { ['screen-setup','screen-home','screen-mode','screen-settings'].forEach(s => s === id ? show(s) : hide(s)); }
+function showOnly(id) { ['screen-setup','screen-home','screen-mode','screen-settings','screen-progress'].forEach(s => s === id ? show(s) : hide(s)); }
 
 function h(tag, cls, ...children) {
   const e = document.createElement(tag);
@@ -570,7 +663,7 @@ function updateSessionBar() {
   show('session-bar');
 }
 
-function recordResult(correct, score, max) {
+function recordResult(correct, score, max, drillTypeId) {
   STATE.session.correct  += correct ? 1 : 0;
   STATE.session.total    += 1;
   STATE.session.score    += score;
@@ -582,7 +675,12 @@ function recordResult(correct, score, max) {
       if (idx < LEVELS.length - 1) { STATE.level = LEVELS[idx + 1]; save('lt_level', STATE.level); renderLevelBtns(); }
     }
   }
+  if (drillTypeId) trackDrill(drillTypeId, correct, score, max);
   updateSessionBar();
+}
+
+function recordModeResult(mode, score, max) {
+  trackMode(mode, score, max);
 }
 
 function renderLevelBtns() {
@@ -936,7 +1034,7 @@ function renderDrills(container) {
           const fb2 = await callClaudeJSON([{role:'user',content:prompt}], tutorSystem(), 1200);
           feedbacks[currentIdx] = fb2;
           scores[currentIdx] = fb2.overall_correct;
-          recordResult(fb2.overall_correct, fb2.score||0, fb2.max||1);
+          recordResult(fb2.overall_correct, fb2.score||0, fb2.max||1, q.type);
           renderQuestion();
         } catch(e) { main.appendChild(errBox(e.message, ()=>{})); submitBtn.disabled=false; submitBtn.textContent='Submit'; }
       });
@@ -1054,7 +1152,7 @@ function renderDrills(container) {
             fb2.score = fb2.overall_correct ? 3 : 0;
             feedbacks[currentIdx] = fb2;
             scores[currentIdx] = fb2.overall_correct;
-            recordResult(fb2.overall_correct, fb2.score, 3);
+            recordResult(fb2.overall_correct, fb2.score, 3, q.type);
             renderQuestion();
           } catch(e) { console.error(e); }
         };
@@ -1224,6 +1322,7 @@ function renderTranslation(container) {
         if (fb.register_note) fbCard.innerHTML += `<div style="font-size:13px;color:var(--textMid)">🎭 ${fb.register_note}</div>`;
         container.appendChild(fbCard);
         recordResult(fb.score>=4, fb.score||0, 5);
+        recordModeResult('translation', fb.score||0, 5);
         container.appendChild(btn('btn-primary', 'Next Challenge →', () => renderTranslation(container)));
       } catch(e) { container.appendChild(errBox(e.message, ()=>renderTranslation(container))); }
     });
@@ -1290,6 +1389,7 @@ function renderFreeWrite(container) {
         }
         if (fb.focus_next) { const fn = div(''); fn.style.cssText='font-size:13px;color:var(--blue);font-style:italic;background:var(--blueBg);padding:8px 12px;border-radius:8px'; fn.textContent=`📌 Next focus: ${fb.focus_next}`; container.appendChild(fn); }
         recordResult(fb.score>=7, fb.score, 10);
+        recordModeResult('freewrite', fb.score, 10);
         container.appendChild(btn('btn-primary','New Prompt →',()=>renderFreeWrite(container)));
       } catch(e) { container.appendChild(errBox(e.message, ()=>{})); submitBtn.disabled=false; submitBtn.textContent='Get Feedback'; }
     });
@@ -1420,6 +1520,7 @@ function renderReading(container) {
 
         submitBtn.remove();
         recordResult(fb.total>=fb.max*0.7, fb.total||0, fb.max||9);
+        recordModeResult('reading', fb.total||0, fb.max||9);
         const sumCard = div('card card-green');
         sumCard.innerHTML = '<div class="flex justify-between items-center" style="margin-bottom:8px">'
           + '<span style="color:var(--textMid)">' + fb.overall_comment + '</span>'
@@ -1710,9 +1811,188 @@ function renderFeedback(container, fb) {
   }
 
   const btns = div('flex gap-10 wrap');
+  recordModeResult('conversation', 0, 0);
   btns.appendChild(btn('btn-purple','New Conversation',()=>renderConversation(container)));
   btns.appendChild(btn('btn-secondary','Back to Home',()=>showOnly('screen-home')));
   container.appendChild(btns);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROGRESS SCREEN
+// ═══════════════════════════════════════════════════════════════
+function renderProgress() {
+  const s = el('screen-progress');
+  s.innerHTML = '';
+  s.className = 'fade-in';
+  const p = loadProgress();
+
+  // Back button
+  const backBtn = btn('btn-secondary', '← Back', () => showOnly('screen-home'));
+  backBtn.style.marginBottom = '20px';
+  s.appendChild(backBtn);
+
+  const streak = calcStreak();
+  const sessions = totalSessions();
+  const days = Object.keys(p.days).sort();
+
+  // ── Summary cards ────────────────────────────────────────────
+  const summaryRow = div('flex gap-10 wrap');
+  summaryRow.style.marginBottom = '20px';
+
+  function statCard(val, label, color) {
+    const c = div('card text-center');
+    c.style.cssText = 'flex:1;min-width:80px;padding:14px 10px';
+    c.innerHTML = '<div style="font-family:Georgia,serif;font-size:28px;font-weight:700;color:'+color+'">'+val+'</div>'
+      +'<div style="font-size:11px;color:var(--textFaint);text-transform:uppercase;letter-spacing:1px;margin-top:2px">'+label+'</div>';
+    return c;
+  }
+
+  summaryRow.appendChild(statCard(streak + (streak===1?' day':' days'), 'Streak', streak >= 7 ? 'var(--green)' : streak >= 3 ? 'var(--gold)' : 'var(--textMid)'));
+  summaryRow.appendChild(statCard(days.length, 'Days Active', 'var(--blue)'));
+  summaryRow.appendChild(statCard(sessions, 'Total Sessions', 'var(--purple)'));
+  s.appendChild(summaryRow);
+
+  // ── 14-day activity heatmap ──────────────────────────────────
+  const heatCard = div('card');
+  heatCard.style.marginBottom = '16px';
+  heatCard.innerHTML = '<div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;font-weight:600">Last 14 Days</div>';
+  const heatRow = div('flex gap-6 wrap');
+  for (let i=13; i>=0; i--) {
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const key = d.toISOString().slice(0,10);
+    const dayData = p.days[key];
+    const total = dayData ? (dayData.drills||0)+(dayData.translation||0)+(dayData.reading||0)+(dayData.freewrite||0)+(dayData.conversation||0) : 0;
+    const intensity = total === 0 ? 0 : total <= 3 ? 1 : total <= 8 ? 2 : 3;
+    const colors = ['var(--border)','#c9e8d4','#6fcfaf','var(--green)'];
+    const cell = div('');
+    cell.style.cssText = 'width:32px;height:32px;border-radius:6px;background:'+colors[intensity]+';display:flex;align-items:center;justify-content:center;cursor:default';
+    cell.title = key + (total ? ': '+total+' exercises' : ': no activity');
+    const dayNum = d.getDate();
+    cell.innerHTML = '<span style="font-size:10px;color:'+(intensity>=2?'#fff':'var(--textFaint)')+'">'+dayNum+'</span>';
+    heatRow.appendChild(cell);
+  }
+  heatCard.appendChild(heatRow);
+  const legend = div('flex gap-10 items-center');
+  legend.style.cssText = 'margin-top:10px;font-size:11px;color:var(--textFaint)';
+  legend.innerHTML = 'Less <span style="display:inline-flex;gap:3px;margin:0 4px">'
+    + ['var(--border)','#c9e8d4','#6fcfaf','var(--green)'].map(c=>'<span style="width:12px;height:12px;border-radius:3px;background:'+c+';display:inline-block"></span>').join('')
+    + '</span> More';
+  heatCard.appendChild(legend);
+  s.appendChild(heatCard);
+
+  // ── Drill type breakdown ─────────────────────────────────────
+  const drillCard = div('card');
+  drillCard.style.marginBottom = '16px';
+  drillCard.innerHTML = '<div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;font-weight:600">Grammar Drill Breakdown</div>';
+
+  const hasAnyDrills = Object.keys(p.drillStats).length > 0;
+  if (!hasAnyDrills) {
+    const empty = div('');
+    empty.style.cssText = 'font-size:13px;color:var(--textFaint);text-align:center;padding:16px 0';
+    empty.textContent = 'Complete some grammar drills to see your breakdown.';
+    drillCard.appendChild(empty);
+  } else {
+    DRILL_TYPES.forEach(dt => {
+      const stats = p.drillStats[dt.id];
+      const attempts = stats ? stats.attempts : 0;
+      const correct  = stats ? stats.correct  : 0;
+      const pct = attempts > 0 ? Math.round((correct/attempts)*100) : null;
+      const barColor = pct === null ? 'var(--border)' : pct >= 80 ? 'var(--green)' : pct >= 60 ? 'var(--gold)' : 'var(--red)';
+
+      const row = div('');
+      row.style.cssText = 'margin-bottom:10px';
+      const info = div('flex justify-between items-center');
+      info.style.marginBottom = '4px';
+      info.innerHTML = '<span style="font-size:13px;color:var(--text)">' + dt.icon + ' ' + dt.label + '</span>'
+        + '<span style="font-size:12px;color:var(--textMid);font-weight:600">'
+        + (pct !== null ? pct+'% <span style="color:var(--textFaint);font-weight:400">('+attempts+' attempts)</span>' : '<span style="color:var(--textFaint)">No data yet</span>')
+        + '</span>';
+      const barWrap = div('');
+      barWrap.style.cssText = 'height:7px;background:var(--border);border-radius:4px;overflow:hidden';
+      const bar = div('');
+      bar.style.cssText = 'height:100%;border-radius:4px;background:'+barColor+';width:'+(pct||0)+'%;transition:width 0.6s ease';
+      barWrap.appendChild(bar);
+      row.appendChild(info);
+      row.appendChild(barWrap);
+      drillCard.appendChild(row);
+    });
+  }
+  s.appendChild(drillCard);
+
+  // ── Weak spots ───────────────────────────────────────────────
+  const weak = getWeakDrillTypes().slice(0,3);
+  if (weak.length) {
+    const weakCard = div('card');
+    weakCard.style.cssText = 'margin-bottom:16px;background:var(--redBg);border-color:#d8b0b0';
+    weakCard.innerHTML = '<div style="font-size:11px;color:var(--red);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:8px;font-weight:600">⚠ Focus Areas</div>'
+      + '<div style="font-size:13px;color:var(--textMid);margin-bottom:10px">Your weakest drill types — these are weighted more heavily in Random Mix sessions.</div>';
+    weak.forEach(id => {
+      const dt = DRILL_TYPES.find(d=>d.id===id);
+      const stats = p.drillStats[id];
+      const pct = Math.round((stats.correct/stats.attempts)*100);
+      const item = div('');
+      item.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px';
+      item.innerHTML = '<span>'+dt.icon+'</span><span style="color:var(--text);flex:1">'+dt.label+'</span>'
+        +'<span style="color:var(--red);font-weight:700">'+pct+'%</span>';
+      weakCard.appendChild(item);
+    });
+    s.appendChild(weakCard);
+  }
+
+  // ── Mode activity summary ────────────────────────────────────
+  const modeCard = div('card');
+  modeCard.style.marginBottom = '16px';
+  modeCard.innerHTML = '<div style="font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:12px;font-weight:600">Activity by Mode</div>';
+
+  const modeTotals = { drills:0, translation:0, reading:0, freewrite:0, conversation:0 };
+  const modeScores = { translation:0, reading:0, freewrite:0 };
+  const modeMax    = { translation:0, reading:0, freewrite:0 };
+  Object.values(p.days).forEach(d => {
+    modeTotals.drills       += d.drills||0;
+    modeTotals.translation  += d.translation||0;
+    modeTotals.reading      += d.reading||0;
+    modeTotals.freewrite    += d.freewrite||0;
+    modeTotals.conversation += d.conversation||0;
+    modeScores.translation  += d.translationScore||0;
+    modeScores.reading      += d.readingScore||0;
+    modeScores.freewrite    += d.freewriteScore||0;
+    modeMax.translation     += (d.translation||0)*5;
+    modeMax.reading         += (d.reading||0)*9;
+    modeMax.freewrite       += (d.freewrite||0)*10;
+  });
+
+  const modeRows = [
+    { icon:'⚡', label:'Grammar Drills',  count:modeTotals.drills,       unit:'exercises', score:null },
+    { icon:'↔', label:'Translation',     count:modeTotals.translation,  unit:'sessions',  score:modeMax.translation>0?Math.round(modeScores.translation/modeMax.translation*100):null },
+    { icon:'📖', label:'Reading',         count:modeTotals.reading,      unit:'passages',  score:modeMax.reading>0?Math.round(modeScores.reading/modeMax.reading*100):null },
+    { icon:'✍', label:'Free Writing',   count:modeTotals.freewrite,    unit:'sessions',  score:modeMax.freewrite>0?Math.round(modeScores.freewrite/modeMax.freewrite*100):null },
+    { icon:'🎙', label:'Conversation',   count:modeTotals.conversation, unit:'sessions',  score:null },
+  ];
+
+  modeRows.forEach(m => {
+    const row = div('flex justify-between items-center');
+    row.style.cssText = 'padding:8px 0;border-bottom:1px solid var(--border)';
+    row.innerHTML = '<span style="font-size:13px;color:var(--text)">' + m.icon + ' ' + m.label + '</span>'
+      + '<span style="font-size:12px;color:var(--textMid)">'
+      + (m.count > 0
+        ? m.count + ' ' + m.unit + (m.score !== null ? ' &nbsp;·&nbsp; <span style="color:var(--gold);font-weight:600">'+m.score+'% avg</span>' : '')
+        : '<span style="color:var(--textFaint)">—</span>')
+      + '</span>';
+    modeCard.appendChild(row);
+  });
+  s.appendChild(modeCard);
+
+  // ── Reset button ─────────────────────────────────────────────
+  const resetBtn = btn('btn-secondary', 'Clear All Progress Data', () => {
+    if (confirm('This will permanently delete all your progress history. Are you sure?')) {
+      localStorage.removeItem(PROGRESS_KEY);
+      renderProgress();
+    }
+  });
+  resetBtn.style.cssText = 'width:100%;font-size:12px;color:var(--red);border-color:var(--red);opacity:0.7';
+  s.appendChild(resetBtn);
+
+  showOnly('screen-progress');
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -1724,6 +2004,10 @@ function init() {
   el('settings-btn').onclick = () => {
     renderSettings();
     showOnly('screen-settings');
+  };
+
+  el('progress-btn').onclick = () => {
+    renderProgress();
   };
 
   if (!STATE.anthropicKey || !STATE.anthropicKey.startsWith('sk-')) {
