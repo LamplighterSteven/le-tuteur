@@ -1538,7 +1538,12 @@ function renderReading(container) {
 // CONVERSATION MODE
 // ═══════════════════════════════════════════════════════════════
 let currentAudio = null;
-function stopAllAudio() { if (currentAudio) { currentAudio.pause(); currentAudio = null; } }
+function stopAllAudio() {
+  if (currentAudio) {
+    try { if (currentAudio.stop) currentAudio.stop(); else if (currentAudio.pause) currentAudio.pause(); } catch(e) {}
+    currentAudio = null;
+  }
+}
 
 // Dedicated feedback system prompt — plain text response, then we parse JSON ourselves
 function feedbackSystem() {
@@ -1716,36 +1721,47 @@ function startConv(container, topic, style) {
     if (messages.length >= 2) bottomBtns.classList.remove('hidden');
   }
 
+  // Shared AudioContext — created once, unlocked on first user gesture
+  let audioCtx = null;
+
+  function getAudioCtx() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    return audioCtx;
+  }
+
+  // Unlock AudioContext synchronously inside a user gesture
+  function unlockAudio() {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') ctx.resume();
+    // Play a silent buffer to fully unlock iOS audio
+    const buf = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(ctx.destination);
+    src.start(0);
+  }
+
+  // Play audio blob via WebAudio API — works on iOS after unlock
+  async function playAudioBlob(blob) {
+    const ctx = getAudioCtx();
+    if (ctx.state === 'suspended') await ctx.resume();
+    const arrayBuf = await blob.arrayBuffer();
+    const audioBuf = await ctx.decodeAudioData(arrayBuf);
+    return new Promise((resolve) => {
+      const src = ctx.createBufferSource();
+      src.buffer = audioBuf;
+      src.connect(ctx.destination);
+      src.onended = resolve;
+      src.start(0);
+      currentAudio = src;
+    });
+  }
+
   async function playTTS(text) {
     setStatus('playing');
     try {
-      // Fetch TTS audio
       const audioBlob = await openaiTTS(text);
-      const url = URL.createObjectURL(audioBlob);
-      currentAudio = new Audio(url);
-      currentAudio.preload = 'auto';
-
-      await new Promise((resolve, reject) => {
-        currentAudio.onended = resolve;
-        currentAudio.onerror = reject;
-        // Explicitly handle the play() promise — critical for iOS Safari
-        const playPromise = currentAudio.play();
-        if (playPromise !== undefined) {
-          playPromise.catch(err => {
-            // iOS suspended audio context — try to resume via user gesture workaround
-            console.warn('play() rejected:', err.message);
-            // Re-attempt once
-            setTimeout(() => {
-              currentAudio.play().catch(e => {
-                console.warn('Retry play failed:', e.message);
-                resolve(); // give up gracefully, don't block
-              });
-            }, 100);
-          });
-        }
-      });
-
-      URL.revokeObjectURL(url);
+      await playAudioBlob(audioBlob);
       currentAudio = null;
     } catch(e) { console.warn('TTS failed:', e.message); }
     setStatus('idle');
@@ -1756,14 +1772,14 @@ function startConv(container, topic, style) {
     addMessage('user', userText);
     const history = messages.map(m=>({role:m.role==='assistant'?'assistant':'user', content:m.text}));
     try {
-      // Fetch TTS in parallel with Claude response to minimise delay
-      const replyPromise = callClaude(history, convSystemStyled(topic, style), 300);
-      const reply = await replyPromise;
+      // Fetch Claude reply and TTS audio in parallel
+      const reply = await callClaude(history, convSystemStyled(topic, style), 300);
       addMessage('assistant', reply);
-      // Small yield to let the DOM update before starting audio
-      await new Promise(r => setTimeout(r, 50));
-      await playTTS(reply);
+      const ttsBlob = await openaiTTS(reply);
+      await playAudioBlob(ttsBlob);
+      currentAudio = null;
     } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
+    setStatus('idle');
   }
 
   micBtn.onclick = async () => {
@@ -1771,9 +1787,19 @@ function startConv(container, topic, style) {
       if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
       return;
     }
-    if (convStatus === 'playing') { stopAllAudio(); setStatus('idle'); return; }
+    if (convStatus === 'playing') {
+      // Stop current audio source
+      try { if (currentAudio && currentAudio.stop) currentAudio.stop(); } catch(e) {}
+      currentAudio = null;
+      setStatus('idle');
+      return;
+    }
     if (convStatus !== 'idle') return;
     errDiv.textContent = '';
+
+    // CRITICAL: unlock AudioContext synchronously here, inside the user gesture
+    unlockAudio();
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({audio:true});
       audioChunks = [];
@@ -1794,14 +1820,18 @@ function startConv(container, topic, style) {
     } catch(e) { errDiv.textContent = '⚠ Microphone access denied. Please allow microphone in browser settings.'; }
   };
 
-  // Opening message
+  // Opening message — unlock audio context immediately (we are inside a button tap handler)
+  unlockAudio();
   (async () => {
     setStatus('thinking');
     try {
-      const opening = await callClaude([{role:'user',content:`Start a natural French conversation on: "${topic}" in style: "${style}". Open with a warm question or observation in French. 1-2 sentences only.`}], convSystemStyled(topic, style), 200);
+      const opening = await callClaude([{role:'user',content:'Start a natural French conversation on: "' + topic + '" in style: "' + style + '". Open with a warm question or observation in French. 1-2 sentences only.'}], convSystemStyled(topic, style), 200);
       addMessage('assistant', opening);
-      await playTTS(opening);
+      const ttsBlob = await openaiTTS(opening);
+      await playAudioBlob(ttsBlob);
+      currentAudio = null;
     } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
+    setStatus('idle');
   })();
 }
 
