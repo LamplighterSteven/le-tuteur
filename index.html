@@ -1343,20 +1343,87 @@ function renderReading(container) {
     const submitBtn = btn('btn-primary','Submit Answers', async () => {
       submitBtn.disabled=true; submitBtn.textContent='Marking…';
       try {
-        const fb = await callClaudeJSON([{role:'user',content:`Passage: "${passage.passage}"\nQ&A:\n${passage.questions.map(q=>`Q: ${q.question}\nA: ${answers[q.id]||'(blank)'}`).join('\n\n')}\nReturn JSON: {"results":[{"id":string,"correct":boolean,"score":number 0-3,"feedback":string,"model_answer":string}],"total":number,"max":number,"overall_comment":string}`}], tutorSystem(), 800);
+        const markingPrompt = 'Passage: "' + passage.passage + '"\n\n'
+          + 'Questions and student answers:\n'
+          + passage.questions.map(q => 'Q: ' + q.question + '\nA: ' + (answers[q.id] || '(blank)')).join('\n\n')
+          + '\n\nFor each answer: assess comprehension, then analyse the French grammar in detail. '
+          + 'Identify every grammatical error — tense, agreement, syntax, vocabulary, missing accents, wrong preposition etc. '
+          + 'Return JSON: {"results":[{"id":string,"correct":boolean,"score":number 0-3,'
+          + '"feedback":string,"student_answer":string,"model_answer":string,'
+          + '"grammar_errors":[{"error":string,"correction":string,"rule":string}],'
+          + '"vocab_note":string}],"total":number,"max":number,"overall_comment":string}';
+
+        const fb = await callClaudeJSON([{role:'user',content:markingPrompt}], tutorSystem(), 1400);
+
         qCards.forEach(({qc, q}) => {
           const r = fb.results?.find(x=>x.id===q.id);
           if (!r) return;
-          qc.className = `card${r.correct?' card-green':' card-red'}`;
+          qc.className = 'card' + (r.correct ? ' card-green' : ' card-red');
           const ans = qc.querySelector('textarea');
           if (ans) ans.remove();
-          qc.innerHTML += `<div style="font-size:13px;color:var(--textMid);font-style:italic;margin-bottom:6px">Your answer: ${answers[q.id]||''}</div>
-            <div style="font-size:13px;color:${r.correct?'var(--green)':'var(--red)'};font-weight:600">${r.feedback}</div>
-            <div style="font-size:13px;color:var(--textMid);margin-top:4px">✦ ${r.model_answer}</div>`;
+
+          // Your answer
+          const yourAns = div('');
+          yourAns.style.cssText = 'font-size:13px;color:var(--textMid);font-style:italic;margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)';
+          yourAns.textContent = 'Your answer: ' + (answers[q.id] || '');
+          qc.appendChild(yourAns);
+
+          // Comprehension feedback
+          const compDiv = div('');
+          compDiv.style.cssText = 'font-size:13px;font-weight:600;color:' + (r.correct ? 'var(--green)' : 'var(--red)') + ';margin-bottom:8px';
+          compDiv.textContent = r.feedback;
+          qc.appendChild(compDiv);
+
+          // Grammar errors
+          if (r.grammar_errors && r.grammar_errors.length > 0) {
+            const geHeader = div('');
+            geHeader.style.cssText = 'font-size:11px;color:var(--gold);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px;font-weight:600';
+            geHeader.textContent = 'Grammar errors';
+            qc.appendChild(geHeader);
+
+            r.grammar_errors.forEach(ge => {
+              const geCard = div('');
+              geCard.style.cssText = 'background:var(--redBg);border-left:3px solid var(--red);border-radius:0 6px 6px 0;padding:8px 12px;margin-bottom:6px';
+              const errLine = div('');
+              errLine.style.cssText = 'font-size:13px;margin-bottom:3px';
+              errLine.innerHTML = '<span style="color:var(--red)">' + ge.error + '</span>'
+                + ' <span style="color:var(--textFaint)">→</span> '
+                + '<span style="color:var(--green);font-weight:600">' + ge.correction + '</span>';
+              const ruleLine = div('');
+              ruleLine.style.cssText = 'font-size:12px;color:var(--textMid)';
+              ruleLine.textContent = ge.rule;
+              geCard.appendChild(errLine);
+              geCard.appendChild(ruleLine);
+              qc.appendChild(geCard);
+            });
+          } else if (r.correct) {
+            const okDiv = div('');
+            okDiv.style.cssText = 'font-size:12px;color:var(--green);margin-bottom:6px';
+            okDiv.textContent = '✓ No grammatical errors';
+            qc.appendChild(okDiv);
+          }
+
+          // Vocab note
+          if (r.vocab_note) {
+            const vn = div('');
+            vn.style.cssText = 'font-size:12px;color:var(--blue);background:var(--blueBg);padding:6px 10px;border-radius:6px;margin-bottom:6px';
+            vn.textContent = '💬 ' + r.vocab_note;
+            qc.appendChild(vn);
+          }
+
+          // Model answer
+          const modelDiv = div('');
+          modelDiv.style.cssText = 'font-size:13px;color:var(--textMid);margin-top:4px;padding-top:8px;border-top:1px solid var(--border)';
+          modelDiv.innerHTML = '<span style="color:var(--gold);font-weight:600">✦ Model answer: </span>' + r.model_answer;
+          qc.appendChild(modelDiv);
         });
+
         submitBtn.remove();
         recordResult(fb.total>=fb.max*0.7, fb.total||0, fb.max||9);
-        const sumCard = div('card card-green'); sumCard.innerHTML = `<div class="flex justify-between items-center" style="margin-bottom:8px"><span style="color:var(--textMid)">${fb.overall_comment}</span><span class="serif" style="font-size:22px;color:var(--gold);font-weight:700">${fb.total}/${fb.max}</span></div>`;
+        const sumCard = div('card card-green');
+        sumCard.innerHTML = '<div class="flex justify-between items-center" style="margin-bottom:8px">'
+          + '<span style="color:var(--textMid)">' + fb.overall_comment + '</span>'
+          + '<span class="serif" style="font-size:22px;color:var(--gold);font-weight:700">' + fb.total + '/' + fb.max + '</span></div>';
         sumCard.appendChild(btn('btn-primary','Next Passage →',()=>renderReading(container)));
         container.appendChild(sumCard);
       } catch(e) { container.appendChild(errBox(e.message,()=>{})); submitBtn.disabled=false; submitBtn.textContent='Submit Answers'; }
@@ -1372,17 +1439,112 @@ function renderReading(container) {
 let currentAudio = null;
 function stopAllAudio() { if (currentAudio) { currentAudio.pause(); currentAudio = null; } }
 
-function renderConversation(container) {
-  const themes = STATE.focusVocab.length ? STATE.focusVocab : ['Everyday Life','Food & Eating Out','Travel & Transport','Work & Career'];
-  const topic = themes[Math.floor(Math.random()*themes.length)];
-  let messages = []; // {role, text}
-  let mediaRecorder = null, audioChunks = [], recording = false;
-  let convStatus = 'idle'; // idle | recording | thinking | playing
+// Dedicated feedback system prompt — plain text response, then we parse JSON ourselves
+function feedbackSystem() {
+  return 'You are a French language tutor giving brief feedback on a student conversation. ' +
+    'Respond ONLY with a valid JSON object. No markdown, no backticks, no explanation outside the JSON. ' +
+    'Start with { and end with }.';
+}
 
-  // UI elements
+const CONV_STYLES = [
+  { id: 'casual',    label: 'Casual chat',        icon: '☕', desc: 'Relaxed everyday conversation' },
+  { id: 'formal',    label: 'Formal / business',  icon: '💼', desc: 'Professional register' },
+  { id: 'debate',    label: 'Opinion & debate',   icon: '💬', desc: 'Share and defend viewpoints' },
+  { id: 'roleplay',  label: 'Real-life scenario', icon: '🎭', desc: 'e.g. restaurant, hotel, airport' },
+  { id: 'news',      label: 'News & current events', icon: '📰', desc: 'Discuss current events and news topics' },
+];
+
+function convSystemStyled(topic, style) {
+  const styleInstructions = {
+    casual:   'Keep the register informal and warm — use tu, contractions, casual vocabulary.',
+    formal:   'Use a formal register throughout — vous, complete sentences, professional vocabulary.',
+    debate:   'Engage the student in sharing and defending opinions. Ask follow-up questions that push for more depth.',
+    roleplay:'Stay fully in character for the real-life scenario described. React naturally as that character would.',
+    news:     'Discuss current events and news topics with the student. Share perspectives and ask for theirs.',
+  };
+  return `You are a friendly native French speaker having a natural conversation at ${STATE.level} level. ` +
+    `Topic/scenario: "${topic}". ` +
+    (styleInstructions[style] || '') +
+    ' Reply in French, 2-3 sentences. If the student makes a serious error, model the correct form naturally without explaining. ' +
+    'Never switch to English. Never comment on grammar. Plain text only — no JSON, no markdown.';
+}
+
+function renderConversation(container) {
+  // ── Step 1: Topic selector screen ──
+  container.innerHTML = '';
+
+  const selectorCard = div('card card-purple');
+  selectorCard.style.padding = '24px';
+
+  selectorCard.innerHTML = `
+    <div style="font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:2px;margin-bottom:4px">Conversation</div>
+    <div style="font-family:'Playfair Display',serif;font-size:20px;font-weight:700;margin-bottom:16px">What would you like to talk about?</div>
+    <div style="font-size:12px;color:var(--textMid);margin-bottom:8px;font-weight:600">Choose a style</div>
+    <div id="style-picker" style="display:flex;flex-direction:column;gap:8px;margin-bottom:20px"></div>
+    <div style="font-size:12px;color:var(--textMid);margin-bottom:6px;font-weight:600">Topic or scenario</div>
+    <div style="font-size:11px;color:var(--textFaint);margin-bottom:8px">Type your own, or pick a suggestion below</div>
+    <input id="topic-input" class="inp" placeholder="e.g. Ordering food in a Parisian bistro…" style="margin-bottom:10px" />
+    <div id="topic-suggestions" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:20px"></div>
+  `;
+  container.appendChild(selectorCard);
+
+  // Style picker
+  let selectedStyle = 'casual';
+  const stylePicker = selectorCard.querySelector('#style-picker');
+  CONV_STYLES.forEach(s => {
+    const b = document.createElement('button');
+    b.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:8px;border:1px solid var(--border);background:var(--surface);cursor:pointer;text-align:left;transition:all 0.15s;font-family:inherit;width:100%';
+    b.innerHTML = `<span style="font-size:18px">${s.icon}</span><div><div style="font-size:13px;font-weight:600;color:var(--text)">${s.label}</div><div style="font-size:11px;color:var(--textFaint)">${s.desc}</div></div>`;
+    b.dataset.sid = s.id;
+    b.onclick = () => {
+      stylePicker.querySelectorAll('button').forEach(x => { x.style.borderColor='var(--border)'; x.style.background='var(--surface)'; });
+      b.style.borderColor = 'var(--purple)'; b.style.background = 'var(--purpleBg)';
+      selectedStyle = s.id;
+    };
+    if (s.id === 'casual') { b.style.borderColor='var(--purple)'; b.style.background='var(--purpleBg)'; }
+    stylePicker.appendChild(b);
+  });
+
+  // Topic suggestions
+  const suggestions = STATE.focusVocab.length ? STATE.focusVocab : [
+    'Everyday Life','Food & Eating Out','Travel & Transport','Work & Career',
+    'Culture & Arts','Health & Wellbeing','Technology','Environment & Society'
+  ];
+  const sugWrap = selectorCard.querySelector('#topic-suggestions');
+  const topicInput = selectorCard.querySelector('#topic-input');
+  suggestions.slice(0,8).forEach(s => {
+    const p = document.createElement('button');
+    p.className = 'pill';
+    p.textContent = s;
+    p.onclick = () => { topicInput.value = s; };
+    sugWrap.appendChild(p);
+  });
+
+  const startBtn = btn('btn-purple', 'Start Conversation →', () => {
+    const topic = topicInput.value.trim() || suggestions[0];
+    container.innerHTML = '';
+    startConv(container, topic, selectedStyle);
+  });
+  startBtn.style.width = '100%';
+  startBtn.style.padding = '13px';
+  container.appendChild(startBtn);
+}
+
+function startConv(container, topic, style) {
+  let messages = [];
+  let mediaRecorder = null, audioChunks = [];
+  let convStatus = 'idle';
+
+  // Topic header
   const topicCard = div('card card-purple flex justify-between items-center');
   topicCard.style.padding = '12px 16px';
-  topicCard.innerHTML = `<div><div style="font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:2px">Conversation Topic</div><div style="font-size:15px;font-weight:600;margin-top:2px">${topic}</div></div><div id="conv-count" style="font-size:11px;color:var(--textFaint)">0 échanges</div>`;
+  const styleLabel = CONV_STYLES.find(s=>s.id===style)?.label || style;
+  topicCard.innerHTML = `
+    <div>
+      <div style="font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:2px">${styleLabel}</div>
+      <div style="font-size:15px;font-weight:600;margin-top:2px">${topic}</div>
+    </div>
+    <div id="conv-count" style="font-size:11px;color:var(--textFaint)">0 échanges</div>`;
 
   const chatWrap = document.createElement('div');
   chatWrap.id = 'chat-messages';
@@ -1397,30 +1559,46 @@ function renderConversation(container) {
   micBtn.textContent = '🎙';
   micWrap.appendChild(micBtn);
 
-  const endBtn = btn('btn-purple hidden', 'End & Get Feedback', async () => {
+  const bottomBtns = div('flex gap-10 justify-center flex-wrap hidden');
+  bottomBtns.id = 'conv-bottom-btns';
+
+  const endBtn = btn('btn-purple', 'End & Get Feedback', async () => {
     endBtn.disabled = true; endBtn.textContent = 'Analysing…';
     stopAllAudio();
-    const transcript = messages.map(m=>`${m.role==='user'?'Student':'Tutor'}: ${m.text}`).join('\n');
+    const transcript = messages.map(m=>(m.role==='user'?'Student':'Tutor')+': '+m.text).join('\n');
+    const feedbackPrompt = 'French conversation transcript. Student level: '+STATE.level+'.'+'\n\n'+transcript+'\n\nBrief feedback on 2-3 significant or recurring errors only. Note 1-2 genuine strengths. Be encouraging.'+'\n\nReturn this exact JSON:\n{"overall":"string","main_errors":[{"pattern":"string","example":"string","correction":"string"}],"strengths":["string"],"tip":"string"}';
     try {
-      const fb = await callClaudeJSON([{role:'user',content:`French conversation transcript. Student level: ${STATE.level}.\n\n${transcript}\n\nBrief feedback on 2-3 significant/recurring errors only. Note 1-2 strengths. Be encouraging. Return JSON: {"overall":string,"main_errors":[{"pattern":string,"example":string,"correction":string}],"strengths":[string],"tip":string}`}], tutorSystem(), 800);
-      renderFeedback(fb);
-    } catch(e) { container.appendChild(errBox(e.message,()=>{})); endBtn.disabled=false; endBtn.textContent='End & Get Feedback'; }
+      const text = await callClaude([{role:'user',content:feedbackPrompt}], feedbackSystem(), 1000);
+      const clean = text.replace(/^[\s\S]*?(\{)/, '$1').replace(/\}[\s\S]*$/, '}');
+      let fb;
+      try { fb = JSON.parse(clean); }
+      catch { fb = JSON.parse(text.replace(/```json|```/g,'').trim()); }
+      renderFeedback(container, fb);
+    } catch(e) {
+      const errD = div('text-center'); errD.style.cssText='color:var(--red);font-size:13px;margin-top:8px';
+      errD.textContent = '⚠ Could not generate feedback — ' + e.message;
+      container.appendChild(errD);
+      endBtn.disabled=false; endBtn.textContent='End & Get Feedback';
+    }
   });
+
+  const changeBtn = btn('btn-secondary', 'Change Topic', () => { stopAllAudio(); renderConversation(container); });
+
+  bottomBtns.append(endBtn, changeBtn);
 
   const errDiv = div('text-center');
   errDiv.style.cssText = 'font-size:13px;color:var(--red);min-height:20px';
 
-  container.append(topicCard, chatWrap, statusLabel, micWrap, endBtn, errDiv);
+  container.append(topicCard, chatWrap, statusLabel, micWrap, bottomBtns, errDiv);
 
   function setStatus(s) {
     convStatus = s;
-    micBtn.className = 'btn' + (s==='recording'?' listening':s==='playing'?' speaking':'');
-    micBtn.style.cssText = `width:72px;height:72px;border-radius:50%;border:none;font-size:28px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;`;
-    if (s==='recording') { micBtn.style.background='var(--red)'; micBtn.style.color='#fff'; micBtn.style.animation='pulse 1.5s ease-in-out infinite'; micBtn.textContent='⏹'; }
-    else if (s==='playing') { micBtn.style.background='var(--purple)'; micBtn.style.color='#fff'; micBtn.style.animation='none'; micBtn.textContent='⏹'; }
+    micBtn.style.cssText = 'width:72px;height:72px;border-radius:50%;border:none;font-size:28px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;';
+    if (s==='recording') { micBtn.style.background='var(--red)'; micBtn.style.color='#fff'; micBtn.style.animation='pulse 1.5s ease-in-out infinite'; micBtn.textContent='⏹'; micBtn.disabled=false; }
+    else if (s==='playing') { micBtn.style.background='var(--purple)'; micBtn.style.color='#fff'; micBtn.style.animation='none'; micBtn.textContent='⏹'; micBtn.disabled=false; }
     else if (s==='thinking') { micBtn.style.background='var(--border)'; micBtn.style.color='var(--textMid)'; micBtn.style.animation='none'; micBtn.textContent='⏳'; micBtn.disabled=true; }
     else { micBtn.style.background='var(--goldBtn)'; micBtn.style.color='var(--goldBtnTx)'; micBtn.style.animation='none'; micBtn.textContent='🎙'; micBtn.disabled=false; }
-    statusLabel.textContent = s==='recording'?'🔴 Listening… speak then tap to send':s==='thinking'?'⏳ Thinking…':s==='playing'?'🔊 Speaking…':'Tap the mic to speak';
+    statusLabel.textContent = s==='recording'?'🔴 Listening… speak then tap ⏹ to send':s==='thinking'?'⏳ Thinking…':s==='playing'?'🔊 Speaking… tap ⏹ to skip':'Tap the mic to speak';
     statusLabel.style.color = s==='recording'?'var(--red)':s==='playing'?'var(--purple)':'var(--textFaint)';
   }
 
@@ -1434,7 +1612,7 @@ function renderConversation(container) {
     chatWrap.appendChild(wrap);
     chatWrap.scrollTop = chatWrap.scrollHeight;
     el('conv-count').textContent = `${messages.length} échanges`;
-    if (messages.length >= 2) endBtn.classList.remove('hidden');
+    if (messages.length >= 2) bottomBtns.classList.remove('hidden');
   }
 
   async function playTTS(text) {
@@ -1455,7 +1633,7 @@ function renderConversation(container) {
     addMessage('user', userText);
     const history = messages.map(m=>({role:m.role==='assistant'?'assistant':'user', content:m.text}));
     try {
-      const reply = await callClaude(history, convSystem(topic), 300);
+      const reply = await callClaude(history, convSystemStyled(topic, style), 300);
       addMessage('assistant', reply);
       await playTTS(reply);
     } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
@@ -1463,16 +1641,11 @@ function renderConversation(container) {
 
   micBtn.onclick = async () => {
     if (convStatus === 'recording') {
-      // Stop recording
       if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
       return;
     }
-    if (convStatus === 'playing') {
-      stopAllAudio(); setStatus('idle'); return;
-    }
+    if (convStatus === 'playing') { stopAllAudio(); setStatus('idle'); return; }
     if (convStatus !== 'idle') return;
-
-    // Start recording
     errDiv.textContent = '';
     try {
       const stream = await navigator.mediaDevices.getUserMedia({audio:true});
@@ -1494,48 +1667,52 @@ function renderConversation(container) {
     } catch(e) { errDiv.textContent = '⚠ Microphone access denied. Please allow microphone in browser settings.'; }
   };
 
-  function renderFeedback(fb) {
-    container.innerHTML = '';
-    const fbCard = div('card card-purple');
-    fbCard.innerHTML = `<div class="label" style="color:var(--purple);margin-bottom:8px">Conversation Feedback</div><div style="font-size:15px;line-height:1.7">${fb.overall}</div>`;
-    container.appendChild(fbCard);
-
-    if (fb.main_errors?.length) {
-      const errCard = div('card');
-      errCard.innerHTML = `<div class="label" style="margin-bottom:10px">Key Errors to Work On</div>`;
-      fb.main_errors.forEach((e,i) => {
-        errCard.innerHTML += `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:${i<fb.main_errors.length-1?'1px solid var(--border)':'none'}">
-          <div style="font-size:13px;font-weight:600;margin-bottom:4px">${e.pattern}</div>
-          <div style="font-size:13px;color:var(--red);margin-bottom:2px">You said: <em>"${e.example}"</em></div>
-          <div style="font-size:13px;color:var(--green)">Better: <strong>${e.correction}</strong></div>
-        </div>`;
-      });
-      container.appendChild(errCard);
-    }
-
-    if (fb.strengths?.length) {
-      const sw = div(''); sw.style.cssText='padding:12px 16px;background:var(--greenBg);border-radius:8px;border:1px solid #b0d8bc';
-      sw.innerHTML = `<div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Strengths</div>${fb.strengths.map(s=>`<div style="font-size:13px;color:var(--green);margin-bottom:3px">✓ ${s}</div>`).join('')}`;
-      container.appendChild(sw);
-    }
-
-    if (fb.tip) { const tip=div(''); tip.style.cssText='font-size:13px;color:var(--blue);font-style:italic;background:var(--blueBg);padding:8px 12px;border-radius:8px'; tip.textContent=`📌 ${fb.tip}`; container.appendChild(tip); }
-
-    const btns = div('flex gap-10 wrap');
-    btns.appendChild(btn('btn-purple','New Conversation',()=>renderMode('conversation')));
-    btns.appendChild(btn('btn-secondary','Back to Home',()=>showOnly('screen-home')));
-    container.appendChild(btns);
-  }
-
-  // Start with opening message
+  // Opening message
   (async () => {
     setStatus('thinking');
     try {
-      const opening = await callClaude([{role:'user',content:`Start a natural French conversation on: "${topic}". Open with a warm question or observation in French. 1-2 sentences only.`}], convSystem(topic), 200);
+      const opening = await callClaude([{role:'user',content:`Start a natural French conversation on: "${topic}" in style: "${style}". Open with a warm question or observation in French. 1-2 sentences only.`}], convSystemStyled(topic, style), 200);
       addMessage('assistant', opening);
       await playTTS(opening);
     } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
   })();
+}
+
+function renderFeedback(container, fb) {
+  container.innerHTML = '';
+  const fbCard = div('card card-purple');
+  fbCard.innerHTML = `<div class="label" style="color:var(--purple);margin-bottom:8px">Conversation Feedback</div><div style="font-size:15px;line-height:1.7">${fb.overall || ''}</div>`;
+  container.appendChild(fbCard);
+
+  if (fb.main_errors?.length) {
+    const errCard = div('card');
+    errCard.innerHTML = `<div class="label" style="margin-bottom:10px">Key Errors to Work On</div>`;
+    fb.main_errors.forEach((e,i) => {
+      errCard.innerHTML += `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:${i<fb.main_errors.length-1?'1px solid var(--border)':'none'}">
+        <div style="font-size:13px;font-weight:600;margin-bottom:4px">${e.pattern}</div>
+        <div style="font-size:13px;color:var(--red);margin-bottom:2px">You said: <em>"${e.example}"</em></div>
+        <div style="font-size:13px;color:var(--green)">Better: <strong>${e.correction}</strong></div>
+      </div>`;
+    });
+    container.appendChild(errCard);
+  }
+
+  if (fb.strengths?.length) {
+    const sw = div(''); sw.style.cssText='padding:12px 16px;background:var(--greenBg);border-radius:8px;border:1px solid #b0d8bc';
+    sw.innerHTML = `<div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Strengths</div>${fb.strengths.map(s=>`<div style="font-size:13px;color:var(--green);margin-bottom:3px">✓ ${s}</div>`).join('')}`;
+    container.appendChild(sw);
+  }
+
+  if (fb.tip) {
+    const tip=div(''); tip.style.cssText='font-size:13px;color:var(--blue);font-style:italic;background:var(--blueBg);padding:8px 12px;border-radius:8px';
+    tip.textContent=`📌 ${fb.tip}`;
+    container.appendChild(tip);
+  }
+
+  const btns = div('flex gap-10 wrap');
+  btns.appendChild(btn('btn-purple','New Conversation',()=>renderConversation(container)));
+  btns.appendChild(btn('btn-secondary','Back to Home',()=>showOnly('screen-home')));
+  container.appendChild(btns);
 }
 
 // ═══════════════════════════════════════════════════════════════
