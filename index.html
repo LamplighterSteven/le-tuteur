@@ -1,0 +1,1568 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#f7f5f0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Le Tuteur" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icon.png" />
+  <title>Le Tuteur</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    /* ── Reset & base ─────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #f7f5f0;
+      --surface:   #ffffff;
+      --border:    #e0dbd2;
+      --border2:   #c8c2b8;
+      --text:      #1a1814;
+      --textMid:   #5a5650;
+      --textFaint: #9a948c;
+      --gold:      #9a6c1e;
+      --goldBg:    #f5efe0;
+      --goldBtn:   #c9a84c;
+      --goldBtnTx: #1a1200;
+      --green:     #1e6b3a;
+      --greenBg:   #edf7f1;
+      --red:       #8b2222;
+      --redBg:     #fdf0f0;
+      --blue:      #1e3d8b;
+      --blueBg:    #eef2fc;
+      --purple:    #5a2d8b;
+      --purpleBg:  #f3eeff;
+    }
+    html { height: 100%; }
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100%;
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    button { font-family: inherit; cursor: pointer; }
+    button:disabled { opacity: 0.35; cursor: not-allowed; }
+    textarea, input { font-family: 'Crimson Pro', serif; }
+    textarea:focus, input:focus { outline: none; border-color: var(--goldBtn) !important; box-shadow: 0 0 0 2px rgba(201,168,76,0.18); }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    /* ── Animations ───────────────────────────────────────────── */
+    @keyframes spin    { to { transform: rotate(360deg); } }
+    @keyframes fadeIn  { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes pulse   { 0%,100% { box-shadow: 0 0 0 6px var(--redBg), 0 0 0 10px rgba(139,34,34,0.2); } 50% { box-shadow: 0 0 0 10px var(--redBg), 0 0 0 16px rgba(139,34,34,0.1); } }
+    @keyframes slideIn { from { opacity:0; transform:translateX(20px); } to { opacity:1; transform:translateX(0); } }
+
+    /* ── Layout ───────────────────────────────────────────────── */
+    #app { max-width: 740px; margin: 0 auto; padding: 0 16px 80px; }
+
+    /* ── Cards ────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 18px 20px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card-gold   { background: var(--goldBg);   border-color: #d8c898; }
+    .card-green  { background: var(--greenBg);  border-color: #b0d8bc; }
+    .card-red    { background: var(--redBg);    border-color: #d8b0b0; }
+    .card-blue   { background: var(--blueBg);   border-color: #b0bce8; }
+    .card-purple { background: var(--purpleBg); border-color: #c0a8e8; }
+
+    /* ── Buttons ──────────────────────────────────────────────── */
+    .btn-primary {
+      background: var(--goldBtn); color: var(--goldBtnTx);
+      border: none; border-radius: 8px; padding: 10px 20px;
+      font-size: 13px; font-weight: 700; letter-spacing: 0.3px;
+    }
+    .btn-primary:not(:disabled):hover { opacity: 0.85; }
+    .btn-secondary {
+      background: transparent; color: var(--textMid);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 6px 12px; font-size: 12px;
+    }
+    .btn-secondary:not(:disabled):hover { opacity: 0.8; }
+    .btn-purple { background: var(--purple); color: #fff; border: none; border-radius: 8px; padding: 10px 20px; font-size: 13px; font-weight: 700; }
+    .btn-purple:not(:disabled):hover { opacity: 0.85; }
+
+    /* ── Form elements ────────────────────────────────────────── */
+    .inp {
+      width: 100%; background: #faf9f7;
+      border: 1px solid var(--border); border-radius: 8px;
+      padding: 10px 14px; color: var(--text);
+      font-size: 14px; font-family: 'Crimson Pro', serif;
+    }
+    textarea.inp { resize: vertical; }
+
+    /* ── Pills ────────────────────────────────────────────────── */
+    .pill {
+      padding: 5px 13px; border-radius: 99px; font-size: 12px;
+      border: 1px solid var(--border); background: transparent; color: var(--textMid);
+      font-family: inherit; cursor: pointer; transition: all 0.15s;
+    }
+    .pill.active { background: var(--goldBtn); color: var(--goldBtnTx); border: none; font-weight: 700; }
+
+    /* ── Utilities ────────────────────────────────────────────── */
+    .flex        { display: flex; }
+    .flex-col    { display: flex; flex-direction: column; }
+    .gap-8       { gap: 8px; }
+    .gap-10      { gap: 10px; }
+    .gap-12      { gap: 12px; }
+    .gap-16      { gap: 16px; }
+    .wrap        { flex-wrap: wrap; }
+    .items-center{ align-items: center; }
+    .justify-between { justify-content: space-between; }
+    .justify-center  { justify-content: center; }
+    .text-center { text-align: center; }
+    .fade-in     { animation: fadeIn 0.3s ease; }
+    .slide-in    { animation: slideIn 0.25s ease; }
+    .hidden      { display: none !important; }
+
+    /* ── Typography helpers ───────────────────────────────────── */
+    .label { font-size: 11px; color: var(--gold); text-transform: uppercase; letter-spacing: 2px; margin-bottom: 6px; }
+    .serif { font-family: 'Playfair Display', serif; }
+
+    /* ── Header ───────────────────────────────────────────────── */
+    #header {
+      padding: 28px 0 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+    #header h1 { font-family: 'Playfair Display', serif; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; }
+    #header .subtitle { font-size: 11px; color: var(--textFaint); letter-spacing: 3px; text-transform: uppercase; margin-top: 2px; }
+
+    /* ── Session bar ──────────────────────────────────────────── */
+    #session-bar {
+      margin-top: 16px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px 20px; display: flex; gap: 28px;
+    }
+    .badge-val { font-size: 20px; font-weight: 700; font-family: 'Playfair Display', serif; }
+    .badge-lbl { font-size: 10px; color: var(--textFaint); text-transform: uppercase; letter-spacing: 1px; }
+
+    /* ── Mode cards on home ───────────────────────────────────── */
+    .mode-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 12px; padding: 18px 22px; cursor: pointer;
+      text-align: left; display: flex; gap: 16px; align-items: center;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.05); transition: border-color 0.15s, background 0.15s;
+      width: 100%;
+    }
+    .mode-card:hover { border-color: var(--goldBtn); background: var(--goldBg); }
+    .mode-card.conv:hover { border-color: var(--purple); background: var(--purpleBg); }
+
+    /* ── Drill progress bar ───────────────────────────────────── */
+    .progress-bar { display: flex; gap: 4px; margin-bottom: 20px; }
+    .progress-seg { flex: 1; height: 6px; border-radius: 3px; transition: background 0.3s; background: var(--border); }
+    .progress-seg.active  { background: var(--goldBtn); }
+    .progress-seg.correct { background: var(--green); }
+    .progress-seg.wrong   { background: var(--red); }
+    .progress-seg.done    { background: var(--textFaint); }
+
+    /* ── Pronoun grid ─────────────────────────────────────────── */
+    .pronoun-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pronoun-row  { display: flex; align-items: center; gap: 8px; background: #faf9f7; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; }
+    .pronoun-lbl  { font-size: 13px; color: var(--gold); width: 68px; flex-shrink: 0; font-weight: 600; }
+    .pronoun-row.correct-row { background: var(--greenBg); border-color: #b0d8bc; }
+    .pronoun-row.wrong-row   { background: var(--redBg);   border-color: #d8b0b0; }
+
+    /* ── Hint box ─────────────────────────────────────────────── */
+    .hint-box { border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .hint-box.open { border-color: #b8c8e8; background: var(--blueBg); }
+    .hint-toggle { width: 100%; background: transparent; border: none; padding: 10px 14px; cursor: pointer; display: flex; align-items: center; gap: 8px; text-align: left; }
+    .hint-toggle .chevron { margin-left: auto; font-size: 12px; color: var(--textFaint); transition: transform 0.2s; display: inline-block; }
+    .hint-toggle .chevron.open { transform: rotate(180deg); }
+    .hint-content { padding: 4px 14px 14px; border-top: 1px solid #b8c8e8; }
+    .hint-line { margin-bottom: 2px; font-size: 13px; color: var(--textMid); line-height: 1.6; }
+
+    /* ── Chat bubbles ─────────────────────────────────────────── */
+    #chat-messages { display: flex; flex-direction: column; gap: 10px; max-height: 360px; overflow-y: auto; padding: 4px 0; }
+    .bubble-wrap-user { display: flex; justify-content: flex-end; }
+    .bubble-wrap-ai   { display: flex; justify-content: flex-start; }
+    .bubble {
+      max-width: 80%; padding: 10px 14px; border-radius: 12px;
+      font-size: 15px; font-family: 'Crimson Pro', serif; line-height: 1.6; color: var(--text);
+    }
+    .bubble-user { background: var(--goldBg); border: 1px solid #d8c898; border-bottom-right-radius: 2px; }
+    .bubble-ai   { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 2px; }
+    .bubble-ai .speaker { font-size: 10px; color: var(--purple); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; font-family: 'DM Sans', sans-serif; }
+    .bubble-thinking { padding: 10px 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; border-bottom-left-radius: 2px; font-size: 20px; color: var(--textFaint); }
+
+    /* ── Mic button ───────────────────────────────────────────── */
+    #mic-btn {
+      width: 72px; height: 72px; border-radius: 50%; border: none;
+      font-size: 28px; display: flex; align-items: center; justify-content: center;
+      transition: all 0.2s; background: var(--goldBtn); color: var(--goldBtnTx);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+    #mic-btn.listening { background: var(--red); color: #fff; animation: pulse 1.5s ease-in-out infinite; }
+    #mic-btn.speaking  { background: var(--purple); color: #fff; }
+
+    /* ── Settings screen ──────────────────────────────────────── */
+    #settings-screen { padding: 40px 0; }
+    .key-input { width: 100%; background: #faf9f7; border: 1px solid var(--border); border-radius: 8px; padding: 10px 14px; font-size: 13px; font-family: monospace; color: var(--text); }
+
+    /* ── Tense choice grid ────────────────────────────────────── */
+    .tense-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .tense-opt  { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; cursor: pointer; text-align: left; transition: all 0.15s; }
+    .tense-opt:hover:not(.selected):not(.revealed) { border-color: var(--goldBtn); background: var(--goldBg); }
+    .tense-opt.selected { background: var(--goldBg); border-color: var(--goldBtn); }
+    .tense-opt.correct  { background: var(--greenBg); border-color: #b0d8bc; }
+    .tense-opt.wrong    { background: var(--redBg);   border-color: #d8b0b0; }
+    .tense-opt.faded    { opacity: 0.4; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <div id="header">
+    <div class="flex justify-between items-center">
+      <div>
+        <h1>Le Tuteur</h1>
+        <div class="subtitle">French Language Studio</div>
+      </div>
+      <div class="flex gap-8 items-center">
+        <div class="flex gap-8" id="level-btns"></div>
+        <button class="btn-secondary" id="settings-btn" style="font-size:16px">⚙</button>
+      </div>
+    </div>
+    <div id="session-bar" class="hidden"></div>
+  </div>
+
+  <!-- SCREENS -->
+  <div id="screen-setup"   class="hidden"></div>
+  <div id="screen-home"    class="hidden"></div>
+  <div id="screen-mode"    class="hidden"></div>
+  <div id="screen-settings" class="hidden"></div>
+</div>
+
+<script>
+'use strict';
+
+// ═══════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════
+const STATE = {
+  anthropicKey: localStorage.getItem('lt_ant_key') || '',
+  openaiKey:    localStorage.getItem('lt_oai_key') || '',
+  level:        localStorage.getItem('lt_level')   || 'B2',
+  autoLevel:    localStorage.getItem('lt_auto')    !== 'false',
+  focusTenses:  JSON.parse(localStorage.getItem('lt_tenses') || '[]'),
+  focusVocab:   JSON.parse(localStorage.getItem('lt_vocab')  || '[]'),
+  session: { correct: 0, total: 0, score: 0, maxScore: 0 },
+  mode: null,
+};
+
+function save(key, val) { localStorage.setItem(key, typeof val === 'object' ? JSON.stringify(val) : String(val)); }
+
+// ═══════════════════════════════════════════════════════════════
+// CONSTANTS
+// ═══════════════════════════════════════════════════════════════
+const LEVELS = ['B2', 'C1', 'C2'];
+
+const TENSE_TOPICS = [
+  'Présent','Passé composé','Imparfait','Plus-que-parfait',
+  'Futur simple','Futur antérieur','Conditionnel présent',
+  'Conditionnel passé','Subjonctif présent','Subjonctif passé'
+];
+
+const VOCAB_THEMES = [
+  'Work & Career','Travel & Transport','Food & Eating Out',
+  'Health & Wellbeing','Technology','Environment & Society',
+  'Relationships','Culture & Arts','Politics & News','Everyday Life'
+];
+
+const DRILL_TYPES = [
+  { id:'full_conjugation',    label:'Full Conjugation',        icon:'🔀' },
+  { id:'preposition',         label:'Prepositions',            icon:'🔗' },
+  { id:'noun_gender',         label:'Noun Gender',             icon:'⚤'  },
+  { id:'adjective_agreement', label:'Adjective Agreement',     icon:'✦'  },
+  { id:'tense_choice',        label:'Tense Selection',         icon:'⏱' },
+  { id:'subjunctive_trigger', label:'Subjonctif or Indicatif?',icon:'❓' },
+  { id:'past_tense_choice',   label:'PC vs Imparfait',         icon:'⏪' },
+  { id:'pronoun',             label:'Pronoun Replacement',     icon:'🔄' },
+  { id:'negation',            label:'Negation',                icon:'🚫' },
+  { id:'relative_clause',     label:'Relative Pronouns',       icon:'📎' },
+  { id:'partitive',           label:'Articles & Partitives',   icon:'🧩' },
+  { id:'verb_pattern',        label:'Verb Patterns (à/de)',    icon:'📐' },
+];
+
+const MODES = [
+  { id:'drills',       label:'Grammar Drills',  icon:'⚡', desc:'10 exercises per set — conjugation, gender, prepositions & more' },
+  { id:'translation',  label:'Translation',     icon:'↔', desc:'Translate into French, get corrected' },
+  { id:'freewrite',    label:'Free Writing',    icon:'✍', desc:'Write freely, receive full feedback' },
+  { id:'reading',      label:'Reading',         icon:'📖', desc:'Passages with comprehension questions' },
+  { id:'conversation', label:'Conversation',    icon:'🎙', desc:'Speak back and forth in French — microphone required' },
+];
+
+const PRONOUNS = ['je','tu','il/elle','nous','vous','ils/elles'];
+
+// ═══════════════════════════════════════════════════════════════
+// GRAMMAR HINTS
+// ═══════════════════════════════════════════════════════════════
+const GRAMMAR_HINTS = {
+  full_conjugation: [
+    ['–ER verbs (parler, manger…):','Remove –er for stem. Endings: -e, -es, -e, -ons, -ez, -ent. Most common group.'],
+    ['–IR verbs (finir, choisir…):','Remove –ir for stem. Endings: -is, -is, -it, -issons, -issez, -issent. Note -iss- in plural.'],
+    ['–RE verbs (vendre, attendre…):','Remove –re for stem. Endings: -s, -s, (none), -ons, -ez, -ent. No ending for il/elle.'],
+    ['Irregular verbs:','être, avoir, aller, faire, pouvoir, vouloir, savoir must be memorised — no pattern applies.'],
+    ['Avoir vs Être:','Most verbs take avoir in compound tenses. Être is used for 17 "house" verbs (aller, venir, partir…) and all reflexives. Être verbs: past participle agrees with subject.'],
+  ],
+  preposition: [
+    ['à','= to / at / in (cities). Je vais à Paris. Also used with indirect objects (parler à, téléphoner à).'],
+    ['de','= of / from. Je viens de Lyon. Also follows many verbs (avoir besoin de, décider de).'],
+    ['en','= in — with feminine countries, languages, months, materials. En France, en anglais, en janvier.'],
+    ['dans','= inside / within (physical or future time). Dans la boîte. Dans trois jours.'],
+    ['Contractions:','à + le = au, à + les = aux; de + le = du, de + les = des.'],
+  ],
+  noun_gender: [
+    ['Usually masculine:','–age (le voyage), –ment (le gouvernement), –eau (le bateau), –isme, –phone, –scope.'],
+    ['Usually feminine:','–tion/–sion (la nation), –ure (la culture), –ance/–ence, –té (la liberté), –ette, –ière, –ée, –ade.'],
+    ['Exceptions:','Some common nouns break the rules — le problème, le programme, la main, le silence.'],
+    ['Best strategy:','Learn every noun with its article (le/la/un/une) from the very start.'],
+  ],
+  adjective_agreement: [
+    ['Regular pattern:','Masc.sg: grand | Fem.sg: grande (+e) | Masc.pl: grands (+s) | Fem.pl: grandes (+es)'],
+    ['Already ends in –e:','No change for feminine — jeune, rouge, propre stay the same.'],
+    ['Irregular feminines:','beau→belle, nouveau→nouvelle, vieux→vieille, blanc→blanche, doux→douce, actif→active, heureux→heureuse, gentil→gentille.'],
+    ['Position:','Most adjectives follow the noun. BAGS adjectives precede it: Beauty, Age, Goodness, Size — beau, vieux, petit, grand, bon, mauvais.'],
+  ],
+  tense_choice: [
+    ['Présent','Current states, habits, universal truths.'],
+    ['Passé composé','Completed past actions with a defined endpoint.'],
+    ['Imparfait','Ongoing/habitual past, background description, interrupted actions.'],
+    ['Plus-que-parfait','Past action completed before another past action (had done).'],
+    ['Futur simple','Future events, predictions, promises.'],
+    ['Conditionnel présent','Hypotheticals, polite requests, reported speech (would do).'],
+    ['Subjonctif','Required after doubt, wish, emotion, necessity — and certain conjunctions.'],
+  ],
+  subjunctive_trigger: [
+    ['Wish / Will:','vouloir que, désirer que, préférer que, souhaiter que'],
+    ['Emotion:','être content/triste/surpris que, regretter que, avoir peur que'],
+    ['Doubt / Denial:','douter que, ne pas croire que, ne pas penser que'],
+    ['Necessity:','il faut que, il est nécessaire que, il vaut mieux que'],
+    ['Conjunctions:','bien que, pour que, avant que, à moins que, à condition que, sans que'],
+    ['Formation:','Take ils/elles présent → remove –ent → add: -e, -es, -e, -ions, -iez, -ent'],
+    ['Irregulars:','être→soit, avoir→ait, aller→aille, faire→fasse, pouvoir→puisse, vouloir→veuille'],
+  ],
+  past_tense_choice: [
+    ['Passé composé','Completed action, event with clear beginning/end, sudden change. "Il a téléphoné."'],
+    ['Imparfait','Background state, ongoing situation, habit, repeated action, description. "Il téléphonait tous les soirs."'],
+    ['Classic combo:','Imparfait sets the scene; passé composé is the interrupting event. "Je lisais quand il a appelé."'],
+    ['Imparfait triggers:','toujours, souvent, d\'habitude, chaque jour, autrefois, parfois.'],
+    ['Passé composé triggers:','soudain, tout à coup, un jour, enfin, d\'abord, puis, ensuite.'],
+  ],
+  pronoun: [
+    ['Direct object (COD):','le (m.sg), la (f.sg), les (pl). Je vois Marie → Je la vois.'],
+    ['Indirect object (COI):','lui (sg), leur (pl). Je parle à Paul → Je lui parle.'],
+    ['y','Replaces à + place or à + thing. Je pense à ce projet → J\'y pense.'],
+    ['en','Replaces de + thing / partitive / quantity. Je mange du pain → J\'en mange.'],
+    ['Placement:','All pronouns go BEFORE the verb (or auxiliary in compound tenses).'],
+    ['Stacking order:','me/te/se/nous/vous → le/la/les → lui/leur → y → en'],
+  ],
+  negation: [
+    ['ne … pas','Standard negation — not'],
+    ['ne … plus','No longer, not anymore'],
+    ['ne … jamais','Never'],
+    ['ne … rien','Nothing (rien can be subject: Rien ne change.)'],
+    ['ne … personne','Nobody (personne follows past participle in compound tenses)'],
+    ['ne … que','Only (restriction, not true negation)'],
+    ['ne … ni … ni','Neither … nor'],
+    ['After negation:','Indefinite articles (un, une, des) and partitives (du, de la) become de. Je n\'ai pas d\'amis.'],
+  ],
+  relative_clause: [
+    ['qui','Subject of the clause. L\'homme qui parle est mon ami.'],
+    ['que','Direct object. Le livre que je lis est long. (Elides: qu\'avant vowel.)'],
+    ['dont','Replaces de + noun — for verbs taking de, or possession. Le film dont je parle.'],
+    ['où','Replaces place or time. La ville où je suis né. Le jour où il est parti.'],
+    ['lequel/laquelle…','After prepositions (other than de/à with people). La table sur laquelle j\'ai posé mon café.'],
+    ['Quick test:','Can replace with subject "who"? → qui. Object "whom/that"? → que.'],
+  ],
+  partitive: [
+    ['le / la / les','Specific things, or general/abstract nouns. J\'aime le café. La liberté est précieuse.'],
+    ['un / une / des','One of, some (countable). J\'ai un chien. Elle a des amis.'],
+    ['du / de la / de l\'','Unspecified amount of uncountable. Je mange du pain. Elle boit de la limonade.'],
+    ['After negation:','All become de (or d\' before vowel). Je ne mange pas de viande.'],
+    ['After quantities:','Also use de. Beaucoup de travail. Un verre de vin. Assez d\'argent.'],
+  ],
+  verb_pattern: [
+    ['No preposition:','aimer, aller, vouloir, pouvoir, devoir, savoir, espérer, préférer, sembler, oser, laisser, voir, entendre…'],
+    ['Verb + à:','commencer à, continuer à, réussir à, apprendre à, hésiter à, s\'habituer à, tenir à, aider à…'],
+    ['Verb + de:','décider de, essayer de, finir de, oublier de, refuser de, avoir peur de, choisir de, arrêter de, mériter de…'],
+    ['Memory tip:','"à" implies direction/tendency toward something; "de" implies completion, cause, or origin.'],
+  ],
+};
+
+// ═══════════════════════════════════════════════════════════════
+// API CALLS
+// ═══════════════════════════════════════════════════════════════
+async function callClaude(messages, systemMsg, maxTokens = 1400) {
+  const r = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': STATE.anthropicKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({ model: 'claude-sonnet-4-5', max_tokens: maxTokens, system: systemMsg, messages }),
+  });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error.message);
+  if (data.stop_reason === 'max_tokens') throw new Error('Response truncated — please try again.');
+  const raw = data.content?.find(b => b.type === 'text')?.text || '';
+  const clean = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '').trim();
+  return clean;
+}
+
+async function callClaudeJSON(messages, systemMsg, maxTokens = 1400) {
+  const text = await callClaude(messages, systemMsg, maxTokens);
+  try { return JSON.parse(text); } catch {
+    const i = text.lastIndexOf('}');
+    if (i > 0) { try { return JSON.parse(text.slice(0, i + 1)); } catch {} }
+    throw new Error('Invalid JSON response — please try again.');
+  }
+}
+
+async function whisperTranscribe(blob) {
+  const fd = new FormData();
+  fd.append('file', blob, 'audio.webm');
+  fd.append('model', 'whisper-1');
+  fd.append('language', 'fr');
+  const r = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${STATE.openaiKey}` },
+    body: fd,
+  });
+  const data = await r.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.text || '';
+}
+
+async function openaiTTS(text) {
+  const r = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${STATE.openaiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model: 'tts-1', voice: 'nova', input: text, speed: 0.92 }),
+  });
+  if (!r.ok) { const e = await r.json(); throw new Error(e.error?.message || 'TTS failed'); }
+  const ab = await r.arrayBuffer();
+  return new Blob([ab], { type: 'audio/mpeg' });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SYSTEM PROMPTS
+// ═══════════════════════════════════════════════════════════════
+function tutorSystem() {
+  return `You are an expert French tutor. Student: native English speaker, French degree, rusty after 12 years. ` +
+    `Level: ${STATE.level}. Tense focus: ${STATE.focusTenses.join(', ') || 'all'}. ` +
+    `Vocab focus: ${STATE.focusVocab.join(', ') || 'general'}. ` +
+    `CRITICAL: respond ONLY with valid raw JSON. No markdown, no backticks, no preamble. Start with { end with }.`;
+}
+
+function convSystem(topic) {
+  return `You are a friendly native French speaker having a natural conversation at ${STATE.level} level. ` +
+    `Topic: "${topic}". Reply in French, 2-3 sentences. If student makes a serious error, model the correct form naturally without explaining. ` +
+    `Never switch to English. Never comment on grammar. Plain text only — no JSON, no markdown.`;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRILL PROMPTS
+// ═══════════════════════════════════════════════════════════════
+const DRILL_PROMPTS = {
+  full_conjugation: () =>
+    `Generate a full conjugation drill at ${STATE.level} level.${STATE.focusTenses.length ? ` Prioritise: ${STATE.focusTenses.join(', ')}.` : ''}${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"full_conjugation","verb":string,"tense":string,"context_sentence":string,"answers":{"je":string,"tu":string,"il/elle":string,"nous":string,"vous":string,"ils/elles":string},"note":string}`,
+
+  preposition: () =>
+    `Generate a preposition gap-fill at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"preposition","instruction":"Fill in the missing preposition","sentence_before":string,"sentence_after":string,"answer":string,"alternatives":[string],"explanation":string}`,
+
+  noun_gender: () =>
+    `Generate a noun gender exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''} Give exactly 4 nouns.
+Return JSON: {"type":"noun_gender","instruction":"Choose le or la for each noun","nouns":[{"noun":string,"answer":"le"|"la","tip":string}]}`,
+
+  adjective_agreement: () =>
+    `Generate an adjective agreement exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"adjective_agreement","instruction":string,"sentence":string,"adjective_base":string,"answer":string,"explanation":string}`,
+
+  tense_choice: () =>
+    `Generate a tense-selection multiple-choice exercise at ${STATE.level} level.${STATE.focusTenses.length ? ` Tenses: ${STATE.focusTenses.join(', ')}.` : ''}${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"tense_choice","context":string,"sentence_with_verb":string,"options":[{"tense":string,"form":string},{"tense":string,"form":string},{"tense":string,"form":string},{"tense":string,"form":string}],"correct_index":number,"explanation":string}`,
+
+  subjunctive_trigger: () =>
+    `Generate a subjunctive-or-indicative exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"subjunctive_trigger","instruction":"Subjonctif or indicatif? Give the correct form.","sentence":string,"verb":string,"answer":string,"mood":"subjunctive"|"indicative","trigger":string,"explanation":string}`,
+
+  past_tense_choice: () =>
+    `Generate a passé composé vs imparfait exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"past_tense_choice","instruction":"Fill each gap with passé composé or imparfait","paragraph_parts":[{"before":string,"gap_id":"A","after":string},{"before":string,"gap_id":"B","after":string}],"verb_A":string,"verb_B":string,"answer_A":string,"answer_B":string,"explanation_A":string,"explanation_B":string}`,
+
+  pronoun: () =>
+    `Generate a pronoun replacement exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"pronoun","instruction":string,"original_sentence":string,"target_phrase":string,"pronoun_type":string,"answer":string,"explanation":string}`,
+
+  negation: () =>
+    `Generate a negation exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"negation","instruction":string,"original":string,"negative_form":string,"answer":string,"note":string}`,
+
+  relative_clause: () =>
+    `Generate a relative pronoun exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''}
+Return JSON: {"type":"relative_clause","instruction":"Fill in the correct relative pronoun","sentence":string,"answer":string,"alternatives":[string],"explanation":string}`,
+
+  partitive: () =>
+    `Generate an article/partitive exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''} Give exactly 4 gaps.
+Return JSON: {"type":"partitive","instruction":"Fill in the correct article or partitive","items":[{"sentence":string,"answer":string,"explanation":string}]}`,
+
+  verb_pattern: () =>
+    `Generate a verb-pattern (à/de/nothing) exercise at ${STATE.level} level.${STATE.focusVocab.length ? ` Vocab: ${STATE.focusVocab.join(', ')}.` : ''} Give exactly 4 verbs.
+Return JSON: {"type":"verb_pattern","instruction":"Does this verb take à, de, or no preposition before the infinitive?","items":[{"example":string,"verb":string,"answer":"à"|"de"|"nothing","full_example":string}]}`,
+};
+
+// ═══════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════
+function el(id) { return document.getElementById(id); }
+function show(id) { el(id).classList.remove('hidden'); }
+function hide(id) { el(id).classList.add('hidden'); }
+function showOnly(id) { ['screen-setup','screen-home','screen-mode','screen-settings'].forEach(s => s === id ? show(s) : hide(s)); }
+
+function h(tag, cls, ...children) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  children.forEach(c => { if (c == null) return; if (typeof c === 'string') e.appendChild(document.createTextNode(c)); else e.appendChild(c); });
+  return e;
+}
+function div(cls, ...ch) { return h('div', cls, ...ch); }
+function btn(cls, text, onClick) { const b = h('button', cls, text); b.onclick = onClick; return b; }
+function inp(cls, placeholder, value='') { const i = document.createElement('input'); i.className = cls; i.placeholder = placeholder; i.value = value; return i; }
+function textarea(cls, placeholder, rows=3) { const t = document.createElement('textarea'); t.className = cls; t.placeholder = placeholder; t.rows = rows; return t; }
+function spinner(msg='Generating…') {
+  const w = div('text-center', ' ');
+  w.innerHTML = `<div style="animation:spin 1.2s linear infinite;display:inline-block;font-size:28px;color:var(--gold)">◌</div><div style="font-size:13px;color:var(--textMid);letter-spacing:1px;margin-top:8px">${msg}</div>`;
+  w.style.padding = '40px 0';
+  return w;
+}
+function errBox(msg, onRetry) {
+  const w = div('card card-red text-center', ' ');
+  w.style.padding = '28px';
+  w.innerHTML = `<div style="color:var(--red);margin-bottom:10px;font-size:14px">⚠ ${msg}</div>`;
+  const b = btn('btn-primary', 'Try Again', onRetry);
+  w.appendChild(b);
+  return w;
+}
+
+function updateSessionBar() {
+  const s = STATE.session;
+  if (s.total === 0) { hide('session-bar'); return; }
+  const pct = s.maxScore > 0 ? Math.round((s.score / s.maxScore) * 100) : 0;
+  const pctColor = pct >= 75 ? 'var(--green)' : pct >= 50 ? 'var(--gold)' : 'var(--red)';
+  el('session-bar').innerHTML = `
+    <div class="text-center"><div class="badge-val" style="color:var(--green)">${s.correct}/${s.total}</div><div class="badge-lbl">Correct</div></div>
+    <div class="text-center"><div class="badge-val" style="color:var(--gold)">${s.score}/${s.maxScore}</div><div class="badge-lbl">Score</div></div>
+    <div class="text-center"><div class="badge-val" style="color:${pctColor}">${pct}%</div><div class="badge-lbl">%</div></div>
+    <div class="text-center"><div class="badge-val" style="color:var(--blue)">${STATE.level}</div><div class="badge-lbl">Level</div></div>
+  `;
+  show('session-bar');
+}
+
+function recordResult(correct, score, max) {
+  STATE.session.correct  += correct ? 1 : 0;
+  STATE.session.total    += 1;
+  STATE.session.score    += score;
+  STATE.session.maxScore += max;
+  if (STATE.autoLevel && STATE.session.total >= 5) {
+    const pct = STATE.session.score / Math.max(STATE.session.maxScore, 1);
+    if (pct > 0.85) {
+      const idx = LEVELS.indexOf(STATE.level);
+      if (idx < LEVELS.length - 1) { STATE.level = LEVELS[idx + 1]; save('lt_level', STATE.level); renderLevelBtns(); }
+    }
+  }
+  updateSessionBar();
+}
+
+function renderLevelBtns() {
+  const c = el('level-btns');
+  c.innerHTML = '';
+  LEVELS.forEach(l => {
+    const b = btn(l === STATE.level ? 'btn-secondary' : 'btn-secondary', l, () => {
+      STATE.level = l; STATE.autoLevel = false; save('lt_level', l); save('lt_auto', 'false'); renderLevelBtns();
+    });
+    if (l === STATE.level) { b.style.color = 'var(--gold)'; b.style.borderColor = 'var(--goldBtn)'; b.style.background = 'var(--goldBg)'; b.style.fontWeight = '700'; }
+    c.appendChild(b);
+  });
+}
+
+// Hint box
+function makeHintBox(typeId) {
+  const rows = GRAMMAR_HINTS[typeId];
+  if (!rows) return null;
+  const box = div('hint-box');
+  let open = false;
+  const toggle = document.createElement('button');
+  toggle.className = 'hint-toggle';
+  toggle.innerHTML = `<span style="font-size:14px">💡</span><span style="font-size:12px;font-weight:600;color:var(--blue)">Grammar Hint</span><span class="chevron">▾</span>`;
+  const content = div('hint-content hidden');
+  rows.forEach(([label, text]) => {
+    const line = div('hint-line');
+    line.innerHTML = `<strong style="color:var(--text)">${label}</strong> ${text}`;
+    content.appendChild(line);
+  });
+  toggle.onclick = () => {
+    open = !open;
+    box.classList.toggle('open', open);
+    content.classList.toggle('hidden', !open);
+    toggle.querySelector('.chevron').classList.toggle('open', open);
+  };
+  box.appendChild(toggle);
+  box.appendChild(content);
+  return box;
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETUP SCREEN
+// ═══════════════════════════════════════════════════════════════
+function renderSetup() {
+  const s = el('screen-setup');
+  s.innerHTML = '';
+  s.className = 'fade-in';
+
+  const wrap = div('flex-col gap-16');
+  wrap.style.padding = '40px 0';
+
+  const title = div('text-center');
+  title.innerHTML = `<div class="serif" style="font-size:32px;font-weight:700;margin-bottom:8px">Le Tuteur</div>
+    <div style="font-size:14px;color:var(--textMid)">Enter your API keys to get started.<br>They are stored only on your device.</div>`;
+
+  const antCard = div('card flex-col gap-10');
+  antCard.innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--text)">Anthropic API Key</div>
+    <div style="font-size:11px;color:var(--textFaint)">From console.anthropic.com — starts with sk-ant-</div>`;
+  const antInp = document.createElement('input');
+  antInp.className = 'key-input';
+  antInp.type = 'password';
+  antInp.placeholder = 'sk-ant-...';
+  antInp.value = STATE.anthropicKey;
+  antCard.appendChild(antInp);
+
+  const oaiCard = div('card flex-col gap-10');
+  oaiCard.innerHTML = `<div style="font-size:12px;font-weight:600;color:var(--text)">OpenAI API Key</div>
+    <div style="font-size:11px;color:var(--textFaint)">From platform.openai.com — starts with sk- (used for voice only)</div>`;
+  const oaiInp = document.createElement('input');
+  oaiInp.className = 'key-input';
+  oaiInp.type = 'password';
+  oaiInp.placeholder = 'sk-...';
+  oaiInp.value = STATE.openaiKey;
+  oaiCard.appendChild(oaiInp);
+
+  const errDiv = div('');
+  errDiv.style.cssText = 'color:var(--red);font-size:13px;text-align:center;min-height:20px';
+
+  const saveBtn = btn('btn-primary', 'Save & Start', () => {
+    const ant = antInp.value.trim();
+    const oai = oaiInp.value.trim();
+    if (!ant || !ant.startsWith('sk-')) { errDiv.textContent = 'Please enter a valid Anthropic API key.'; return; }
+    STATE.anthropicKey = ant;
+    STATE.openaiKey = oai;
+    save('lt_ant_key', ant);
+    save('lt_oai_key', oai);
+    renderHome();
+    showOnly('screen-home');
+  });
+  saveBtn.style.width = '100%';
+  saveBtn.style.padding = '14px';
+
+  wrap.append(title, antCard, oaiCard, errDiv, saveBtn);
+  s.appendChild(wrap);
+  showOnly('screen-setup');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// SETTINGS SCREEN (in-app)
+// ═══════════════════════════════════════════════════════════════
+function renderSettings() {
+  const s = el('screen-settings');
+  s.innerHTML = '';
+  s.className = 'fade-in';
+
+  function pillRow(items, active, toggle) {
+    const row = div('flex wrap gap-8');
+    items.forEach(item => {
+      const p = btn(active.includes(item) ? 'pill active' : 'pill', item, () => {
+        toggle(item);
+        p.className = active.includes(item) ? 'pill active' : 'pill';
+      });
+      row.appendChild(p);
+    });
+    return row;
+  }
+
+  const wrap = div('flex-col gap-16');
+
+  // Back
+  const backBtn = btn('btn-secondary', '← Back', () => { showOnly('screen-home'); });
+
+  // Tenses
+  const tCard = div('card flex-col gap-10');
+  tCard.innerHTML = '<div style="font-size:12px;color:var(--textMid);font-weight:600">Tense Focus</div>';
+  tCard.appendChild(pillRow(TENSE_TOPICS, STATE.focusTenses, t => {
+    const i = STATE.focusTenses.indexOf(t);
+    if (i >= 0) STATE.focusTenses.splice(i, 1); else STATE.focusTenses.push(t);
+    save('lt_tenses', STATE.focusTenses);
+  }));
+
+  // Vocab
+  const vCard = div('card flex-col gap-10');
+  vCard.innerHTML = '<div style="font-size:12px;color:var(--textMid);font-weight:600">Vocabulary Themes</div>';
+  vCard.appendChild(pillRow(VOCAB_THEMES, STATE.focusVocab, v => {
+    const i = STATE.focusVocab.indexOf(v);
+    if (i >= 0) STATE.focusVocab.splice(i, 1); else STATE.focusVocab.push(v);
+    save('lt_vocab', STATE.focusVocab);
+  }));
+
+  // Auto level
+  const autoCard = div('card flex items-center gap-10');
+  const cb = document.createElement('input');
+  cb.type = 'checkbox'; cb.checked = STATE.autoLevel; cb.style.accentColor = 'var(--goldBtn)';
+  cb.onchange = () => { STATE.autoLevel = cb.checked; save('lt_auto', cb.checked); };
+  const lbl = document.createElement('label');
+  lbl.style.cssText = 'font-size:12px;color:var(--textMid);cursor:pointer';
+  lbl.textContent = 'Auto-advance level at ≥85%';
+  lbl.prepend(cb);
+  autoCard.appendChild(lbl);
+
+  // Reset session
+  const resetBtn = btn('btn-secondary', 'Reset Session', () => {
+    STATE.session = { correct:0, total:0, score:0, maxScore:0 };
+    updateSessionBar();
+  });
+
+  // API keys
+  const keysBtn = btn('btn-secondary', 'Update API Keys', () => { renderSetup(); showOnly('screen-setup'); });
+
+  wrap.append(backBtn, tCard, vCard, autoCard, div('flex gap-10', resetBtn, keysBtn));
+  s.appendChild(wrap);
+  showOnly('screen-settings');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// HOME SCREEN
+// ═══════════════════════════════════════════════════════════════
+function renderHome() {
+  const s = el('screen-home');
+  s.innerHTML = '';
+  s.className = 'fade-in';
+
+  const label = div('');
+  label.style.cssText = 'font-size:13px;color:var(--textFaint);margin-bottom:16px';
+  label.textContent = 'Choose your exercise type';
+
+  const list = div('flex-col gap-10');
+  MODES.forEach(m => {
+    const card = document.createElement('button');
+    card.className = 'mode-card' + (m.id === 'conversation' ? ' conv' : '');
+    card.innerHTML = `<span style="font-size:24px">${m.icon}</span>
+      <div><div style="font-size:15px;font-weight:600">${m.label}</div><div style="font-size:12px;color:var(--textFaint);margin-top:2px">${m.desc}</div></div>
+      <span style="margin-left:auto;color:var(--border2);font-size:18px">›</span>`;
+    card.onclick = () => { STATE.mode = m.id; renderMode(m.id); showOnly('screen-mode'); };
+    list.appendChild(card);
+  });
+
+  s.append(label, list);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODE WRAPPER
+// ═══════════════════════════════════════════════════════════════
+function renderMode(modeId) {
+  const s = el('screen-mode');
+  s.innerHTML = '';
+  s.className = 'fade-in';
+
+  const mode = MODES.find(m => m.id === modeId);
+  const accentColor = modeId === 'conversation' ? 'var(--purple)' : 'var(--gold)';
+
+  // Top bar
+  const topBar = div('flex items-center gap-10');
+  topBar.style.marginBottom = '20px';
+  const backBtn = btn('btn-secondary', '← Back', () => { stopAllAudio(); showOnly('screen-home'); });
+  backBtn.style.fontSize = '11px';
+  const titleSpan = div('');
+  titleSpan.style.cssText = `font-size:14px;color:${accentColor};font-weight:600`;
+  titleSpan.textContent = `${mode.icon} ${mode.label}`;
+  const lvlSpan = div('');
+  lvlSpan.style.cssText = 'font-size:11px;color:var(--textFaint);margin-left:auto';
+  lvlSpan.textContent = `Level: ${STATE.level}`;
+  topBar.append(backBtn, titleSpan, lvlSpan);
+
+  const content = div('flex-col gap-16');
+
+  s.append(topBar, content);
+
+  if (modeId === 'drills')       renderDrills(content);
+  if (modeId === 'translation')  renderTranslation(content);
+  if (modeId === 'freewrite')    renderFreeWrite(content);
+  if (modeId === 'reading')      renderReading(content);
+  if (modeId === 'conversation') renderConversation(content);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DRILLS MODE
+// ═══════════════════════════════════════════════════════════════
+function renderDrills(container) {
+  let questions = [], currentIdx = 0, feedbacks = [], scores = [], filterType = null;
+
+  // Filter bar
+  const filterBar = div('flex wrap gap-8');
+  filterBar.style.cssText = 'padding-bottom:12px;border-bottom:1px solid var(--border)';
+
+  const randBtn = btn('btn-secondary', '🎲 Random Mix', () => { filterType = null; updateFilterBtns(); generateSet(); });
+  randBtn.style.cssText = 'font-size:11px;font-weight:700;color:var(--gold);border-color:var(--goldBtn)';
+  filterBar.appendChild(randBtn);
+
+  DRILL_TYPES.forEach(dt => {
+    const b = btn('btn-secondary', `${dt.icon} ${dt.label}`, () => { filterType = dt.id; updateFilterBtns(); generateSet(); });
+    b.style.fontSize = '11px';
+    b.dataset.dtid = dt.id;
+    filterBar.appendChild(b);
+  });
+
+  function updateFilterBtns() {
+    filterBar.querySelectorAll('button').forEach((b, i) => {
+      const isActive = i === 0 ? filterType === null : b.dataset.dtid === filterType;
+      b.style.borderColor = isActive ? 'var(--goldBtn)' : 'var(--border)';
+      b.style.color = isActive ? 'var(--gold)' : 'var(--textFaint)';
+      b.style.fontWeight = isActive ? '700' : '400';
+    });
+  }
+
+  // Main content area
+  const main = div('flex-col gap-16');
+  container.append(filterBar, main);
+
+  async function generateSet() {
+    questions = []; feedbacks = []; scores = []; currentIdx = 0;
+    main.innerHTML = '';
+    main.appendChild(spinner('Generating your 10 exercises…'));
+
+    const types = filterType
+      ? Array.from({length:10}, () => filterType)
+      : Array.from({length:10}, () => DRILL_TYPES[Math.floor(Math.random() * DRILL_TYPES.length)].id);
+
+    const results = await Promise.all(types.map(tid =>
+      callClaudeJSON([{role:'user', content: DRILL_PROMPTS[tid]()}], tutorSystem(), 1200)
+        .then(q => ({...q, type: q.type || tid}))
+        .catch(e => { console.warn(tid, e.message); return null; })
+    ));
+
+    questions = results.filter(Boolean);
+    main.innerHTML = '';
+    if (!questions.length) { main.appendChild(errBox('Failed to generate questions.', generateSet)); return; }
+    renderQuestion();
+  }
+
+  function renderProgressBar() {
+    const wrap = div('');
+    const info = div('flex justify-between');
+    info.style.marginBottom = '8px';
+    info.innerHTML = `<span style="font-size:12px;color:var(--textMid);font-weight:600">Exercise ${currentIdx+1} of ${questions.length}</span>
+      <span style="font-size:12px;color:var(--textFaint)">${scores.filter(s=>s===true).length} correct</span>`;
+    const bar = div('progress-bar');
+    questions.forEach((_, i) => {
+      const seg = div('progress-seg');
+      if (i === currentIdx) seg.classList.add('active');
+      else if (scores[i] === true) seg.classList.add('correct');
+      else if (scores[i] === false) seg.classList.add('wrong');
+      else if (i < currentIdx) seg.classList.add('done');
+      bar.appendChild(seg);
+    });
+    wrap.append(info, bar);
+    return wrap;
+  }
+
+  function renderQuestion() {
+    main.innerHTML = '';
+    const q = questions[currentIdx];
+    const fb = feedbacks[currentIdx] || null;
+
+    main.appendChild(renderProgressBar());
+
+    const typeLabel = div('flex justify-between items-center');
+    typeLabel.style.marginBottom = '4px';
+    const typeMeta = DRILL_TYPES.find(d => d.id === q.type);
+    typeLabel.innerHTML = `<span style="font-size:12px;color:var(--textFaint)">${typeMeta?.icon} ${typeMeta?.label}</span>`;
+    if (fb) {
+      const scoreSpan = div('');
+      scoreSpan.style.cssText = `font-size:12px;font-weight:700;color:${fb.overall_correct ? 'var(--green)' : 'var(--red)'}`;
+      scoreSpan.textContent = `${fb.score}/${fb.max}`;
+      typeLabel.appendChild(scoreSpan);
+    }
+    main.appendChild(typeLabel);
+
+    // Hint
+    const hint = makeHintBox(q.type);
+    if (hint) main.appendChild(hint);
+
+    // Question body
+    const qBody = renderQuestionBody(q, fb);
+    main.appendChild(qBody);
+
+    // Nav
+    const nav = div('flex justify-between gap-10');
+    nav.style.marginTop = '4px';
+    const prevBtn = btn('btn-secondary', '← Prev', () => { currentIdx--; feedbacks[currentIdx] = feedbacks[currentIdx] || null; renderQuestion(); });
+    if (currentIdx === 0) prevBtn.disabled = true;
+
+    const rightBtns = div('flex gap-8');
+    if (fb) {
+      const nextBtn = btn('btn-primary', currentIdx < questions.length-1 ? 'Next →' : 'View Results →', () => {
+        if (currentIdx < questions.length-1) { currentIdx++; renderQuestion(); } else renderResults();
+      });
+      rightBtns.appendChild(nextBtn);
+    }
+    nav.append(prevBtn, rightBtns);
+    main.appendChild(nav);
+
+    // Submit button (for non-tense_choice non-feedback)
+    if (!fb && q.type !== 'tense_choice') {
+      const submitBtn = btn('btn-primary', 'Submit', async () => {
+        submitBtn.disabled = true; submitBtn.textContent = 'Marking…';
+        const answers = collectAnswers(q);
+        const prompt = `Drill type: ${q.type}\nQuestion: ${JSON.stringify(q)}\nStudent answers: ${JSON.stringify(answers)}\nMark concisely. Return JSON: {"results":[{"id":string,"correct":boolean,"student":string,"correct_answer":string,"explanation":string}],"overall_correct":boolean,"score":number,"max":number,"tip":string}`;
+        try {
+          const fb2 = await callClaudeJSON([{role:'user',content:prompt}], tutorSystem(), 1200);
+          feedbacks[currentIdx] = fb2;
+          scores[currentIdx] = fb2.overall_correct;
+          recordResult(fb2.overall_correct, fb2.score||0, fb2.max||1);
+          renderQuestion();
+        } catch(e) { main.appendChild(errBox(e.message, ()=>{})); submitBtn.disabled=false; submitBtn.textContent='Submit'; }
+      });
+      nav.appendChild(submitBtn);
+    }
+  }
+
+  function collectAnswers(q) {
+    const ans = {};
+    if (q.type === 'full_conjugation') {
+      PRONOUNS.forEach(p => { ans[p] = main.querySelector(`[data-pronoun="${p}"]`)?.value || ''; });
+    } else if (q.type === 'noun_gender') {
+      q.nouns?.forEach((_, i) => { ans[i] = main.querySelector(`[data-noun="${i}"].selected-art`)?.dataset.art || ''; });
+    } else if (q.type === 'past_tense_choice') {
+      ans['A'] = main.querySelector('[data-gap="A"]')?.value || '';
+      ans['B'] = main.querySelector('[data-gap="B"]')?.value || '';
+    } else if (q.type === 'verb_pattern' || q.type === 'partitive') {
+      q.items?.forEach((_, i) => { ans[i] = main.querySelector(`[data-item="${i}"]`)?.value || ''; });
+    } else {
+      ans['main'] = main.querySelector('[data-main]')?.value || '';
+    }
+    return ans;
+  }
+
+  function renderQuestionBody(q, fb) {
+    const wrap = div('flex-col gap-12');
+
+    if (q.type === 'full_conjugation') {
+      const card = div('card card-gold');
+      card.innerHTML = `<div class="label">${q.tense}</div>
+        <div class="serif" style="font-size:22px;margin-bottom:4px">${q.verb}</div>
+        ${q.context_sentence ? `<div style="font-size:13px;color:var(--textMid);font-style:italic">«${q.context_sentence}»</div>` : ''}
+        ${q.note ? `<div style="font-size:12px;color:var(--textFaint);margin-top:6px">💡 ${q.note}</div>` : ''}`;
+      wrap.appendChild(card);
+
+      const grid = div('pronoun-grid');
+      PRONOUNS.forEach(p => {
+        const r = fb?.results?.find(x => x.id === p);
+        const row = div(`pronoun-row${fb ? (r?.correct ? ' correct-row' : ' wrong-row') : ''}`);
+        const lbl = div('pronoun-lbl'); lbl.textContent = p;
+        row.appendChild(lbl);
+        if (fb) {
+          const span = div(''); span.style.cssText = `font-size:13px;font-weight:600;color:${r?.correct ? 'var(--green)' : 'var(--red)'}`;
+          span.innerHTML = r?.correct ? r.student : `<s style="opacity:0.5">${r?.student}</s> → ${r?.correct_answer}`;
+          row.appendChild(span);
+        } else {
+          const i = document.createElement('input');
+          i.className = 'inp'; i.style.cssText = 'padding:5px 10px;font-size:13px';
+          i.placeholder = '…'; i.dataset.pronoun = p;
+          row.appendChild(i);
+        }
+        grid.appendChild(row);
+      });
+      wrap.appendChild(grid);
+      if (fb?.tip) { const tip = div('card card-blue'); tip.innerHTML = `<span style="font-size:12px;color:var(--blue)">📌 ${fb.tip}</span>`; wrap.appendChild(tip); }
+    }
+
+    else if (q.type === 'noun_gender') {
+      const hdr = div('card card-gold'); hdr.innerHTML = `<div class="label">Noun Gender</div><div style="font-size:14px;color:var(--textMid)">${q.instruction}</div>`;
+      wrap.appendChild(hdr);
+      q.nouns?.forEach((n, i) => {
+        const r = fb?.results?.find(x => x.id === String(i));
+        const row = div(`card${fb ? (r?.correct ? ' card-green' : ' card-red') : ''} flex items-center gap-10`);
+        const nounSpan = div('serif'); nounSpan.style.cssText = 'font-size:17px;flex:1'; nounSpan.textContent = n.noun;
+        row.appendChild(nounSpan);
+        if (fb) {
+          const res = div(''); res.innerHTML = `<span style="color:${r?.correct?'var(--green)':'var(--red)'};font-weight:700">${r?.correct?'✓ ':'✗ '}${r?.correct_answer}</span>`;
+          if (!r?.correct && r?.explanation) res.innerHTML += `<div style="font-size:12px;color:var(--textMid);margin-top:3px">${r.explanation}</div>`;
+          row.appendChild(res);
+        } else {
+          const artBtns = div('flex gap-8');
+          ['le','la'].forEach(art => {
+            const b = btn('btn-secondary', art, () => {
+              artBtns.querySelectorAll('button').forEach(x => { x.classList.remove('selected-art'); x.style.borderColor='var(--border)'; x.style.color='var(--textMid)'; x.style.fontWeight='400'; delete x.dataset.art; });
+              b.classList.add('selected-art'); b.style.borderColor='var(--goldBtn)'; b.style.color='var(--gold)'; b.style.fontWeight='700'; b.dataset.art = art;
+            });
+            b.dataset.noun = i;
+            artBtns.appendChild(b);
+          });
+          row.appendChild(artBtns);
+        }
+        wrap.appendChild(row);
+      });
+    }
+
+    else if (q.type === 'tense_choice') {
+      const hdr = div('card card-gold');
+      hdr.innerHTML = `<div class="label">Choose the Correct Tense</div>
+        ${q.context ? `<div style="font-size:13px;color:var(--textMid);font-style:italic;margin-bottom:8px">${q.context}</div>` : ''}
+        <div class="serif" style="font-size:17px">${q.sentence_with_verb}</div>`;
+      wrap.appendChild(hdr);
+
+      const grid = div('tense-grid');
+      q.options?.forEach((opt, i) => {
+        const isCorrect = i === q.correct_index;
+        const optCard = div('tense-opt');
+        if (fb) {
+          const isChosen = fb.results?.find(x=>x.id==='main')?.student === String(i);
+          if (isCorrect) { optCard.classList.add('correct'); }
+          else if (isChosen) { optCard.classList.add('wrong'); }
+          else { optCard.classList.add('faded'); }
+        }
+        optCard.innerHTML = `<div style="font-size:11px;color:var(--textFaint)">${opt.tense}</div>
+          <div style="font-size:15px;font-style:italic;margin-top:2px">${opt.form}</div>
+          ${fb&&isCorrect?'<div style="font-size:11px;color:var(--green);margin-top:4px;font-weight:700">✓ Correct</div>':''}`;
+        if (!fb) optCard.onclick = async () => {
+          grid.querySelectorAll('.tense-opt').forEach(x => x.classList.remove('selected'));
+          optCard.classList.add('selected');
+          // Auto-submit on click for tense choice
+          grid.querySelectorAll('.tense-opt').forEach(x => { x.classList.add('revealed'); x.style.cursor='default'; x.onclick=null; });
+          const prompt = `Drill type: tense_choice\nQuestion: ${JSON.stringify(q)}\nStudent answers: ${JSON.stringify({main:i})}\nReturn JSON: {"results":[{"id":"main","correct":${i===q.correct_index},"student":"${i}","correct_answer":"${q.correct_index}","explanation":""}],"overall_correct":${i===q.correct_index},"score":${i===q.correct_index?3:0},"max":3,"tip":""}`;
+          try {
+            const fb2 = await callClaudeJSON([{role:'user',content:prompt}], tutorSystem(), 600);
+            fb2.overall_correct = (i === q.correct_index);
+            fb2.score = fb2.overall_correct ? 3 : 0;
+            feedbacks[currentIdx] = fb2;
+            scores[currentIdx] = fb2.overall_correct;
+            recordResult(fb2.overall_correct, fb2.score, 3);
+            renderQuestion();
+          } catch(e) { console.error(e); }
+        };
+        grid.appendChild(optCard);
+      });
+      wrap.appendChild(grid);
+      if (fb?.explanation) { const ex = div('card card-blue'); ex.innerHTML = `<div style="font-size:13px;color:var(--blue)">${q.explanation||fb.explanation}</div>`; wrap.appendChild(ex); }
+    }
+
+    else if (q.type === 'past_tense_choice') {
+      const hdr = div('card card-gold');
+      let parasHtml = (q.paragraph_parts||[]).map(p =>
+        `${p.before} <span style="background:var(--goldBtn);color:var(--goldBtnTx);font-weight:700;padding:1px 6px;border-radius:4px;font-size:13px">[${p.gap_id}: ${q['verb_'+p.gap_id]}]</span> ${p.after}`
+      ).join(' ');
+      hdr.innerHTML = `<div class="label">Passé Composé vs Imparfait</div>
+        <div style="font-size:14px;color:var(--textMid);margin-bottom:12px">${q.instruction}</div>
+        <div class="serif" style="font-size:16px;line-height:2.1">${parasHtml}</div>`;
+      wrap.appendChild(hdr);
+      ['A','B'].forEach(gid => {
+        const r = fb?.results?.find(x=>x.id===gid);
+        const gCard = div(`card${fb?(r?.correct?' card-green':' card-red'):''}`);
+        gCard.innerHTML = `<div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">Gap ${gid} — <em>${q['verb_'+gid]}</em></div>`;
+        if (fb) {
+          gCard.innerHTML += `<span style="color:${r?.correct?'var(--green)':'var(--red)'};font-weight:700">${r?.correct?'✓ ':'✗ '}${r?.correct_answer}</span>`;
+          if (!r?.correct) gCard.innerHTML += ` <span style="color:var(--textMid);font-size:13px">(you: ${r?.student})</span>`;
+          if (q['explanation_'+gid]) gCard.innerHTML += `<div style="font-size:12px;color:var(--textMid);margin-top:4px">${q['explanation_'+gid]}</div>`;
+        } else {
+          const i = document.createElement('input');
+          i.className='inp'; i.placeholder='Conjugate…'; i.dataset.gap = gid;
+          gCard.appendChild(i);
+        }
+        wrap.appendChild(gCard);
+      });
+      if (fb?.tip) { const tip=div('card card-blue'); tip.innerHTML=`<span style="font-size:12px;color:var(--blue)">📌 ${fb.tip}</span>`; wrap.appendChild(tip); }
+    }
+
+    else if (q.type === 'verb_pattern' || q.type === 'partitive') {
+      const typeMeta = DRILL_TYPES.find(d=>d.id===q.type);
+      const hdr = div('card card-gold');
+      hdr.innerHTML = `<div class="label">${typeMeta?.label}</div><div style="font-size:14px;color:var(--textMid)">${q.instruction}</div>`;
+      wrap.appendChild(hdr);
+      q.items?.forEach((item,i) => {
+        const r = fb?.results?.find(x=>x.id===String(i));
+        const iCard = div(`card${fb?(r?.correct?' card-green':' card-red'):''}`);
+        iCard.innerHTML = `<div class="serif" style="font-size:15px;font-style:italic;margin-bottom:8px">${item.sentence||item.example}</div>`;
+        if (fb) {
+          iCard.innerHTML += `<span style="color:${r?.correct?'var(--green)':'var(--red)'};font-weight:700">${r?.correct?'✓ ':'✗ '}${r?.correct_answer}</span>`;
+          if (!r?.correct) iCard.innerHTML += ` <span style="color:var(--textMid);font-size:13px">(you: ${r?.student})</span>`;
+          if (r?.explanation) iCard.innerHTML += `<div style="font-size:12px;color:var(--textMid);margin-top:4px">${r.explanation}</div>`;
+        } else {
+          const inp2 = document.createElement('input');
+          inp2.className='inp'; inp2.style.cssText='padding:6px 12px;font-size:13px';
+          inp2.placeholder = q.type==='verb_pattern'?'à / de / nothing':'article…';
+          inp2.dataset.item = i;
+          iCard.appendChild(inp2);
+        }
+        wrap.appendChild(iCard);
+      });
+      if (fb?.tip) { const tip=div('card card-blue'); tip.innerHTML=`<span style="font-size:12px;color:var(--blue)">📌 ${fb.tip}</span>`; wrap.appendChild(tip); }
+    }
+
+    else {
+      // Generic single answer
+      const sentDisplay = (q.type==='preposition'&&q.sentence_before)
+        ? `${q.sentence_before} _____ ${q.sentence_after||''}`
+        : q.sentence||q.original_sentence||q.original||'';
+      const typeMeta = DRILL_TYPES.find(d=>d.id===q.type);
+      const hdr = div('card card-gold');
+      hdr.innerHTML = `<div class="label">${typeMeta?.label||q.type}</div>
+        <div style="font-size:14px;color:var(--textMid);margin-bottom:10px">${q.instruction||''}</div>
+        ${sentDisplay ? `<div class="serif" style="font-size:17px;line-height:1.8">${sentDisplay}</div>` : ''}
+        ${q.adjective_base ? `<div style="font-size:13px;color:var(--textMid);margin-top:6px">Adjective: <strong style="color:var(--gold)">${q.adjective_base}</strong></div>` : ''}
+        ${q.negative_form  ? `<div style="font-size:13px;color:var(--textMid);margin-top:6px">Use: <strong style="color:var(--gold)">${q.negative_form}</strong></div>` : ''}
+        ${q.pronoun_type   ? `<div style="font-size:13px;color:var(--textMid);margin-top:6px">Type: <strong style="color:var(--gold)">${q.pronoun_type}</strong></div>` : ''}
+        ${q.target_phrase  ? `<div style="font-size:13px;color:var(--textMid)">Replace: <em style="color:var(--gold)">«${q.target_phrase}»</em></div>` : ''}
+        ${q.verb&&q.type!=='full_conjugation' ? `<div style="font-size:13px;color:var(--textMid);margin-top:6px">Verb: <strong style="color:var(--gold)">${q.verb}</strong></div>` : ''}`;
+      wrap.appendChild(hdr);
+
+      if (!fb) {
+        const row = div('flex gap-10');
+        const i = document.createElement('input');
+        i.className='inp'; i.placeholder='Votre réponse…'; i.dataset.main='1';
+        row.appendChild(i);
+        wrap.appendChild(row);
+      } else {
+        const fbCard = div(`card${fb.overall_correct?' card-green':' card-red'}`);
+        fbCard.innerHTML = `<div style="font-size:15px;font-weight:700;color:${fb.overall_correct?'var(--green)':'var(--red)'};margin-bottom:8px">${fb.overall_correct?'✓ Correct':'✗ Not quite'}</div>`;
+        fb.results?.forEach(r => {
+          if (!r.correct) fbCard.innerHTML += `<div style="font-size:13px;color:var(--red)">You: <em>${r.student}</em></div>`;
+          fbCard.innerHTML += `<div style="font-size:14px;color:var(--green);font-style:italic;font-weight:600">✦ ${r.correct_answer}</div>`;
+          if (r.explanation) fbCard.innerHTML += `<div style="font-size:12px;color:var(--textMid);margin-top:3px">${r.explanation}</div>`;
+        });
+        if (q.alternatives?.length) fbCard.innerHTML += `<div style="font-size:12px;color:var(--textMid);margin-top:4px">Also valid: ${q.alternatives.join(', ')}</div>`;
+        if (q.explanation||q.note||fb.tip) fbCard.innerHTML += `<div style="font-size:12px;color:var(--blue);margin-top:6px;background:var(--blueBg);padding:6px 10px;border-radius:6px">📌 ${q.explanation||q.note||fb.tip}</div>`;
+        wrap.appendChild(fbCard);
+      }
+    }
+
+    return wrap;
+  }
+
+  function renderResults() {
+    main.innerHTML = '';
+    const correctCount = scores.filter(s=>s===true).length;
+    const summaryCard = div(`card text-center${correctCount>=8?' card-green':correctCount>=6?' card-gold':' card-red'}`);
+    summaryCard.style.padding = '32px';
+    summaryCard.innerHTML = `<div style="font-size:11px;color:var(--textFaint);text-transform:uppercase;letter-spacing:2px;margin-bottom:8px">Set Complete</div>
+      <div class="serif" style="font-size:48px;font-weight:700;color:${correctCount>=8?'var(--green)':correctCount>=6?'var(--gold)':'var(--red)'}">${correctCount}<span style="font-size:24px;color:var(--textFaint)">/10</span></div>
+      <div style="font-size:14px;color:var(--textMid);margin-top:8px">${correctCount===10?'Perfect! Outstanding.':correctCount>=8?'Excellent work.':correctCount>=6?'Good — review the ones below.':'Keep practising.'}</div>`;
+    main.appendChild(summaryCard);
+
+    const list = div('flex-col gap-8');
+    questions.forEach((q,i) => {
+      const s = scores[i]; const fb2 = feedbacks[i];
+      const typeMeta = DRILL_TYPES.find(d=>d.id===q.type);
+      const row = div(`card flex items-center gap-10${s?' card-green':' card-red'}`);
+      row.style.cssText += ';cursor:pointer;padding:12px 16px';
+      row.innerHTML = `<span style="font-size:16px">${s?'✓':'✗'}</span>
+        <span style="font-size:12px;color:var(--textFaint);width:20px">${i+1}</span>
+        <span style="font-size:13px;color:var(--textMid)">${typeMeta?.icon} ${typeMeta?.label}</span>
+        ${fb2?`<span style="margin-left:auto;font-size:12px;color:${s?'var(--green)':'var(--red)'};font-weight:700">${fb2.score}/${fb2.max}</span>`:''}`;
+      row.onclick = () => { currentIdx=i; renderQuestion(); };
+      list.appendChild(row);
+    });
+    main.appendChild(list);
+
+    const newSetBtn = btn('btn-primary', 'New Set of 10 →', generateSet);
+    main.appendChild(newSetBtn);
+  }
+
+  generateSet();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TRANSLATION MODE
+// ═══════════════════════════════════════════════════════════════
+function renderTranslation(container) {
+  container.innerHTML = '';
+  container.appendChild(spinner());
+
+  callClaudeJSON([{role:'user',content:`Generate an English sentence for French translation at ${STATE.level} level.${STATE.focusTenses.length?` Use: ${STATE.focusTenses.join(', ')}.`:''}${STATE.focusVocab.length?` Vocab: ${STATE.focusVocab.join(', ')}.`:''} Natural, conversational. Return JSON: {"english":string,"context":string,"tense_focus":string}`}], tutorSystem())
+  .then(challenge => {
+    container.innerHTML = '';
+    const hdr = div('card card-gold');
+    hdr.innerHTML = `<div class="label">Translate into French · ${challenge.tense_focus}</div>
+      <div class="serif" style="font-size:20px;line-height:1.6">${challenge.english}</div>
+      ${challenge.context?`<div style="font-size:12px;color:var(--textFaint);font-style:italic;margin-top:8px">Context: ${challenge.context}</div>`:''}`;
+
+    const ta = textarea('inp', 'Écrivez votre traduction ici...', 3);
+    const submitBtn = btn('btn-primary', 'Submit', async () => {
+      if (!ta.value.trim()) return;
+      submitBtn.disabled=true; submitBtn.textContent='Analysing…';
+      try {
+        const fb = await callClaudeJSON([{role:'user',content:`Student translating: "${challenge.english}" (context: ${challenge.context})\nTheir translation: "${ta.value}"\nReturn JSON: {"score":number 0-5,"overall":string,"errors":[{"original":string,"issue":string,"fix":string,"explanation":string}],"model_answer":string,"alternative":string,"vocab_note":string,"register_note":string}`}], tutorSystem());
+        container.innerHTML = '';
+        const fbCard = div('card flex-col gap-10');
+        fbCard.innerHTML = `<div class="flex justify-between items-center"><span style="font-size:14px;color:var(--textMid)">${fb.overall}</span><span class="serif" style="font-size:22px;color:var(--gold);font-weight:700">${fb.score}/5</span></div>`;
+        fb.errors?.forEach(e => {
+          const eDiv = div(''); eDiv.style.cssText='background:var(--redBg);border-radius:8px;padding:10px 14px;border-left:3px solid var(--red)';
+          eDiv.innerHTML = `<div style="font-size:13px;color:var(--red)">"${e.original}" → <span style="color:var(--green);font-weight:600">${e.fix}</span></div><div style="font-size:12px;color:var(--textMid);margin-top:4px">${e.explanation}</div>`;
+          fbCard.appendChild(eDiv);
+        });
+        const modelDiv = div(''); modelDiv.style.cssText='padding:12px 16px;background:var(--goldBg);border-radius:8px;border:1px solid #d8c898';
+        modelDiv.innerHTML = `<div class="label" style="margin-bottom:6px">Model Answer</div><div style="font-size:15px;font-style:italic">${fb.model_answer}</div>${fb.alternative?`<div style="font-size:13px;color:var(--textMid);margin-top:6px">Also valid: ${fb.alternative}</div>`:''}`;
+        fbCard.appendChild(modelDiv);
+        if (fb.vocab_note) fbCard.innerHTML += `<div style="font-size:13px;color:var(--blue);background:var(--blueBg);padding:7px 11px;border-radius:7px">💬 ${fb.vocab_note}</div>`;
+        if (fb.register_note) fbCard.innerHTML += `<div style="font-size:13px;color:var(--textMid)">🎭 ${fb.register_note}</div>`;
+        container.appendChild(fbCard);
+        recordResult(fb.score>=4, fb.score||0, 5);
+        container.appendChild(btn('btn-primary', 'Next Challenge →', () => renderTranslation(container)));
+      } catch(e) { container.appendChild(errBox(e.message, ()=>renderTranslation(container))); }
+    });
+    container.append(hdr, ta, submitBtn);
+  })
+  .catch(e => { container.innerHTML=''; container.appendChild(errBox(e.message, ()=>renderTranslation(container))); });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FREE WRITE MODE
+// ═══════════════════════════════════════════════════════════════
+function renderFreeWrite(container) {
+  container.innerHTML = '';
+  container.appendChild(spinner());
+  const theme = STATE.focusVocab.length ? STATE.focusVocab[Math.floor(Math.random()*STATE.focusVocab.length)] : 'everyday life';
+
+  callClaudeJSON([{role:'user',content:`Create a French free-writing prompt in English at ${STATE.level} level. Topic: "${theme}". Return JSON: {"prompt":string,"suggested_length":string,"vocabulary_hints":[{"french":string,"english":string}]}`}], tutorSystem())
+  .then(wp => {
+    container.innerHTML = '';
+    const hdr = div('card card-gold');
+    hdr.innerHTML = `<div class="label">Writing Prompt</div>
+      <div class="serif" style="font-size:18px;line-height:1.6">${wp.prompt}</div>
+      <div style="font-size:12px;color:var(--textFaint);margin-top:8px">Suggested: ${wp.suggested_length}</div>`;
+    if (wp.vocabulary_hints?.length) {
+      const hints = div('flex wrap gap-8'); hints.style.marginTop='12px';
+      wp.vocabulary_hints.forEach(h => {
+        const span = document.createElement('span');
+        span.style.cssText='font-size:12px;background:var(--surface);border:1px solid var(--border);padding:4px 10px;border-radius:6px;color:var(--blue)';
+        span.innerHTML = `<strong>${h.french}</strong> — ${h.english}`;
+        hints.appendChild(span);
+      });
+      hdr.appendChild(hints);
+    }
+
+    const ta = textarea('inp', 'Écrivez votre texte ici en français...', 7);
+    const submitBtn = btn('btn-primary', 'Get Feedback', async () => {
+      if (ta.value.trim().split(/\s+/).length < 5) return;
+      submitBtn.disabled=true; submitBtn.textContent='Reviewing…';
+      try {
+        const fb = await callClaudeJSON([{role:'user',content:`Student wrote French in response to: "${wp.prompt}"\n\nText:\n"""\n${ta.value}\n"""\n\nReturn JSON with EXACTLY: {"score":number 0-10,"summary":string,"corrected_text":string,"grammar_errors":[{"error":string,"correction":string,"rule":string}],"vocabulary_suggestions":[{"used":string,"better":string,"why":string}],"strengths":[string],"focus_next":string}`}], tutorSystem(), 1400);
+        if (typeof fb.score !== 'number') throw new Error('Unexpected response — try again.');
+        container.innerHTML = '';
+        const scoreCard = div('card');
+        scoreCard.innerHTML = `<div class="flex justify-between items-center"><div style="font-size:14px;color:var(--textMid);max-width:80%">${fb.summary}</div><div class="serif" style="font-size:28px;color:var(--gold);font-weight:700">${fb.score}<span style="font-size:14px;color:var(--textFaint)">/10</span></div></div>`;
+        container.appendChild(scoreCard);
+        if (fb.corrected_text) {
+          const ct = div('card'); ct.innerHTML = `<div class="label" style="margin-bottom:8px">Corrected Version</div><div style="font-size:14px;line-height:1.9">${fb.corrected_text.replace(/\[([^\]]+)\]/g,'<span style="color:var(--gold);font-weight:700;background:var(--goldBg);padding:1px 4px;border-radius:3px">[$1]</span>')}</div>`;
+          container.appendChild(ct);
+        }
+        if (fb.grammar_errors?.length) {
+          const ge = div('card'); ge.innerHTML = `<div class="label" style="margin-bottom:8px">Grammar Notes</div>`;
+          fb.grammar_errors.forEach(e => { ge.innerHTML += `<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)"><span style="color:var(--red)">${e.error}</span> → <span style="color:var(--green);font-weight:600">${e.correction}</span><div style="font-size:12px;color:var(--textMid);margin-top:3px">${e.rule}</div></div>`; });
+          container.appendChild(ge);
+        }
+        if (fb.vocabulary_suggestions?.length) {
+          const vs = div('card'); vs.innerHTML = `<div class="label" style="margin-bottom:8px">Vocabulary Upgrades</div>`;
+          fb.vocabulary_suggestions.forEach(v => { vs.innerHTML += `<div style="margin-bottom:8px"><span style="color:var(--textMid)">"${v.used}"</span> → <span style="color:var(--green);font-weight:600">"${v.better}"</span><span style="font-size:12px;color:var(--textFaint)"> — ${v.why}</span></div>`; });
+          container.appendChild(vs);
+        }
+        if (fb.strengths?.length) {
+          const sw = div(''); sw.style.cssText='padding:12px 16px;background:var(--greenBg);border-radius:8px;border:1px solid #b0d8bc';
+          sw.innerHTML = `<div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">What worked well</div>${fb.strengths.map(s=>`<div style="font-size:13px;color:var(--green);margin-bottom:3px">✓ ${s}</div>`).join('')}`;
+          container.appendChild(sw);
+        }
+        if (fb.focus_next) { const fn = div(''); fn.style.cssText='font-size:13px;color:var(--blue);font-style:italic;background:var(--blueBg);padding:8px 12px;border-radius:8px'; fn.textContent=`📌 Next focus: ${fb.focus_next}`; container.appendChild(fn); }
+        recordResult(fb.score>=7, fb.score, 10);
+        container.appendChild(btn('btn-primary','New Prompt →',()=>renderFreeWrite(container)));
+      } catch(e) { container.appendChild(errBox(e.message, ()=>{})); submitBtn.disabled=false; submitBtn.textContent='Get Feedback'; }
+    });
+    container.append(hdr, ta, submitBtn);
+  })
+  .catch(e => { container.innerHTML=''; container.appendChild(errBox(e.message, ()=>renderFreeWrite(container))); });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// READING MODE
+// ═══════════════════════════════════════════════════════════════
+function renderReading(container) {
+  container.innerHTML = '';
+  container.appendChild(spinner());
+  const topic = STATE.focusVocab.length ? STATE.focusVocab[Math.floor(Math.random()*STATE.focusVocab.length)] : 'everyday French life';
+
+  callClaudeJSON([{role:'user',content:`Write a 150-200 word authentic French passage at ${STATE.level} level on: "${topic}".${STATE.focusTenses.length?` Include: ${STATE.focusTenses.join(', ')}.`:''} Then 3 comprehension questions in French. Return JSON: {"title":string,"passage":string,"questions":[{"id":string,"question":string}],"vocabulary":[{"word":string,"meaning":string}]}`}], tutorSystem(), 800)
+  .then(passage => {
+    container.innerHTML = '';
+    let showPassage = true;
+    const passCard = div('card card-gold');
+    function renderPassCard() {
+      passCard.innerHTML = `<div class="flex justify-between items-center" style="margin-bottom:10px">
+        <div class="serif" style="font-size:16px;font-weight:700">${passage.title}</div>
+        <button class="btn-secondary" style="font-size:11px" id="tog-pass">${showPassage?'Hide':'Show'}</button>
+      </div>`;
+      if (showPassage) {
+        passCard.innerHTML += `<div style="font-size:15px;line-height:1.9;font-style:italic">${passage.passage}</div>`;
+        if (passage.vocabulary?.length) {
+          const vd = div('flex wrap gap-8'); vd.style.marginTop='12px';
+          passage.vocabulary.forEach(v => { const s=document.createElement('span'); s.style.cssText='font-size:11px;background:var(--surface);border:1px solid var(--border);padding:3px 9px;border-radius:5px;color:var(--blue)'; s.innerHTML=`<strong>${v.word}</strong> — ${v.meaning}`; vd.appendChild(s); });
+          passCard.appendChild(vd);
+        }
+      }
+      passCard.querySelector('#tog-pass').onclick = () => { showPassage=!showPassage; renderPassCard(); };
+    }
+    renderPassCard();
+    container.appendChild(passCard);
+
+    const answers = {};
+    const qCards = passage.questions.map((q,i) => {
+      const qc = div('card'); qc.dataset.qid = q.id;
+      qc.innerHTML = `<div style="font-size:13px;color:var(--gold);font-weight:600;margin-bottom:8px">Q${i+1}. ${q.question}</div>`;
+      const ta = textarea('inp','Répondez en français...',2);
+      ta.onchange = () => { answers[q.id] = ta.value; };
+      qc.appendChild(ta);
+      container.appendChild(qc);
+      return { qc, ta, q };
+    });
+
+    const submitBtn = btn('btn-primary','Submit Answers', async () => {
+      submitBtn.disabled=true; submitBtn.textContent='Marking…';
+      try {
+        const fb = await callClaudeJSON([{role:'user',content:`Passage: "${passage.passage}"\nQ&A:\n${passage.questions.map(q=>`Q: ${q.question}\nA: ${answers[q.id]||'(blank)'}`).join('\n\n')}\nReturn JSON: {"results":[{"id":string,"correct":boolean,"score":number 0-3,"feedback":string,"model_answer":string}],"total":number,"max":number,"overall_comment":string}`}], tutorSystem(), 800);
+        qCards.forEach(({qc, q}) => {
+          const r = fb.results?.find(x=>x.id===q.id);
+          if (!r) return;
+          qc.className = `card${r.correct?' card-green':' card-red'}`;
+          const ans = qc.querySelector('textarea');
+          if (ans) ans.remove();
+          qc.innerHTML += `<div style="font-size:13px;color:var(--textMid);font-style:italic;margin-bottom:6px">Your answer: ${answers[q.id]||''}</div>
+            <div style="font-size:13px;color:${r.correct?'var(--green)':'var(--red)'};font-weight:600">${r.feedback}</div>
+            <div style="font-size:13px;color:var(--textMid);margin-top:4px">✦ ${r.model_answer}</div>`;
+        });
+        submitBtn.remove();
+        recordResult(fb.total>=fb.max*0.7, fb.total||0, fb.max||9);
+        const sumCard = div('card card-green'); sumCard.innerHTML = `<div class="flex justify-between items-center" style="margin-bottom:8px"><span style="color:var(--textMid)">${fb.overall_comment}</span><span class="serif" style="font-size:22px;color:var(--gold);font-weight:700">${fb.total}/${fb.max}</span></div>`;
+        sumCard.appendChild(btn('btn-primary','Next Passage →',()=>renderReading(container)));
+        container.appendChild(sumCard);
+      } catch(e) { container.appendChild(errBox(e.message,()=>{})); submitBtn.disabled=false; submitBtn.textContent='Submit Answers'; }
+    });
+    container.appendChild(submitBtn);
+  })
+  .catch(e => { container.innerHTML=''; container.appendChild(errBox(e.message,()=>renderReading(container))); });
+}
+
+// ═══════════════════════════════════════════════════════════════
+// CONVERSATION MODE
+// ═══════════════════════════════════════════════════════════════
+let currentAudio = null;
+function stopAllAudio() { if (currentAudio) { currentAudio.pause(); currentAudio = null; } }
+
+function renderConversation(container) {
+  const themes = STATE.focusVocab.length ? STATE.focusVocab : ['Everyday Life','Food & Eating Out','Travel & Transport','Work & Career'];
+  const topic = themes[Math.floor(Math.random()*themes.length)];
+  let messages = []; // {role, text}
+  let mediaRecorder = null, audioChunks = [], recording = false;
+  let convStatus = 'idle'; // idle | recording | thinking | playing
+
+  // UI elements
+  const topicCard = div('card card-purple flex justify-between items-center');
+  topicCard.style.padding = '12px 16px';
+  topicCard.innerHTML = `<div><div style="font-size:11px;color:var(--purple);text-transform:uppercase;letter-spacing:2px">Conversation Topic</div><div style="font-size:15px;font-weight:600;margin-top:2px">${topic}</div></div><div id="conv-count" style="font-size:11px;color:var(--textFaint)">0 échanges</div>`;
+
+  const chatWrap = document.createElement('div');
+  chatWrap.id = 'chat-messages';
+
+  const statusLabel = div('text-center');
+  statusLabel.style.cssText = 'font-size:13px;letter-spacing:1px;font-weight:600;color:var(--textFaint)';
+  statusLabel.textContent = 'Starting conversation…';
+
+  const micWrap = div('flex justify-center items-center gap-20');
+  const micBtn = document.createElement('button');
+  micBtn.id = 'mic-btn';
+  micBtn.textContent = '🎙';
+  micWrap.appendChild(micBtn);
+
+  const endBtn = btn('btn-purple hidden', 'End & Get Feedback', async () => {
+    endBtn.disabled = true; endBtn.textContent = 'Analysing…';
+    stopAllAudio();
+    const transcript = messages.map(m=>`${m.role==='user'?'Student':'Tutor'}: ${m.text}`).join('\n');
+    try {
+      const fb = await callClaudeJSON([{role:'user',content:`French conversation transcript. Student level: ${STATE.level}.\n\n${transcript}\n\nBrief feedback on 2-3 significant/recurring errors only. Note 1-2 strengths. Be encouraging. Return JSON: {"overall":string,"main_errors":[{"pattern":string,"example":string,"correction":string}],"strengths":[string],"tip":string}`}], tutorSystem(), 800);
+      renderFeedback(fb);
+    } catch(e) { container.appendChild(errBox(e.message,()=>{})); endBtn.disabled=false; endBtn.textContent='End & Get Feedback'; }
+  });
+
+  const errDiv = div('text-center');
+  errDiv.style.cssText = 'font-size:13px;color:var(--red);min-height:20px';
+
+  container.append(topicCard, chatWrap, statusLabel, micWrap, endBtn, errDiv);
+
+  function setStatus(s) {
+    convStatus = s;
+    micBtn.className = 'btn' + (s==='recording'?' listening':s==='playing'?' speaking':'');
+    micBtn.style.cssText = `width:72px;height:72px;border-radius:50%;border:none;font-size:28px;display:flex;align-items:center;justify-content:center;transition:all 0.2s;box-shadow:0 2px 8px rgba(0,0,0,0.15);cursor:pointer;`;
+    if (s==='recording') { micBtn.style.background='var(--red)'; micBtn.style.color='#fff'; micBtn.style.animation='pulse 1.5s ease-in-out infinite'; micBtn.textContent='⏹'; }
+    else if (s==='playing') { micBtn.style.background='var(--purple)'; micBtn.style.color='#fff'; micBtn.style.animation='none'; micBtn.textContent='⏹'; }
+    else if (s==='thinking') { micBtn.style.background='var(--border)'; micBtn.style.color='var(--textMid)'; micBtn.style.animation='none'; micBtn.textContent='⏳'; micBtn.disabled=true; }
+    else { micBtn.style.background='var(--goldBtn)'; micBtn.style.color='var(--goldBtnTx)'; micBtn.style.animation='none'; micBtn.textContent='🎙'; micBtn.disabled=false; }
+    statusLabel.textContent = s==='recording'?'🔴 Listening… speak then tap to send':s==='thinking'?'⏳ Thinking…':s==='playing'?'🔊 Speaking…':'Tap the mic to speak';
+    statusLabel.style.color = s==='recording'?'var(--red)':s==='playing'?'var(--purple)':'var(--textFaint)';
+  }
+
+  function addMessage(role, text) {
+    messages.push({role, text});
+    const wrap = div(role==='user'?'bubble-wrap-user':'bubble-wrap-ai');
+    const bubble = div(role==='user'?'bubble bubble-user':'bubble bubble-ai');
+    if (role==='assistant') bubble.innerHTML = '<div class="speaker">Claude</div>';
+    bubble.appendChild(document.createTextNode(text));
+    wrap.appendChild(bubble);
+    chatWrap.appendChild(wrap);
+    chatWrap.scrollTop = chatWrap.scrollHeight;
+    el('conv-count').textContent = `${messages.length} échanges`;
+    if (messages.length >= 2) endBtn.classList.remove('hidden');
+  }
+
+  async function playTTS(text) {
+    setStatus('playing');
+    try {
+      const audioBlob = await openaiTTS(text);
+      const url = URL.createObjectURL(audioBlob);
+      currentAudio = new Audio(url);
+      await new Promise(res => { currentAudio.onended = res; currentAudio.onerror = res; currentAudio.play(); });
+      URL.revokeObjectURL(url);
+      currentAudio = null;
+    } catch(e) { console.warn('TTS failed:', e.message); }
+    setStatus('idle');
+  }
+
+  async function getAndPlayResponse(userText) {
+    setStatus('thinking');
+    addMessage('user', userText);
+    const history = messages.map(m=>({role:m.role==='assistant'?'assistant':'user', content:m.text}));
+    try {
+      const reply = await callClaude(history, convSystem(topic), 300);
+      addMessage('assistant', reply);
+      await playTTS(reply);
+    } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
+  }
+
+  micBtn.onclick = async () => {
+    if (convStatus === 'recording') {
+      // Stop recording
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      return;
+    }
+    if (convStatus === 'playing') {
+      stopAllAudio(); setStatus('idle'); return;
+    }
+    if (convStatus !== 'idle') return;
+
+    // Start recording
+    errDiv.textContent = '';
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+      audioChunks = [];
+      mediaRecorder = new MediaRecorder(stream);
+      mediaRecorder.ondataavailable = e => { if (e.data.size > 0) audioChunks.push(e.data); };
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(t=>t.stop());
+        setStatus('thinking');
+        const blob = new Blob(audioChunks, {type:'audio/webm'});
+        try {
+          const transcript = await whisperTranscribe(blob);
+          if (transcript.trim()) await getAndPlayResponse(transcript.trim());
+          else { errDiv.textContent = 'No speech detected — please try again.'; setStatus('idle'); }
+        } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
+      };
+      mediaRecorder.start();
+      setStatus('recording');
+    } catch(e) { errDiv.textContent = '⚠ Microphone access denied. Please allow microphone in browser settings.'; }
+  };
+
+  function renderFeedback(fb) {
+    container.innerHTML = '';
+    const fbCard = div('card card-purple');
+    fbCard.innerHTML = `<div class="label" style="color:var(--purple);margin-bottom:8px">Conversation Feedback</div><div style="font-size:15px;line-height:1.7">${fb.overall}</div>`;
+    container.appendChild(fbCard);
+
+    if (fb.main_errors?.length) {
+      const errCard = div('card');
+      errCard.innerHTML = `<div class="label" style="margin-bottom:10px">Key Errors to Work On</div>`;
+      fb.main_errors.forEach((e,i) => {
+        errCard.innerHTML += `<div style="margin-bottom:12px;padding-bottom:12px;border-bottom:${i<fb.main_errors.length-1?'1px solid var(--border)':'none'}">
+          <div style="font-size:13px;font-weight:600;margin-bottom:4px">${e.pattern}</div>
+          <div style="font-size:13px;color:var(--red);margin-bottom:2px">You said: <em>"${e.example}"</em></div>
+          <div style="font-size:13px;color:var(--green)">Better: <strong>${e.correction}</strong></div>
+        </div>`;
+      });
+      container.appendChild(errCard);
+    }
+
+    if (fb.strengths?.length) {
+      const sw = div(''); sw.style.cssText='padding:12px 16px;background:var(--greenBg);border-radius:8px;border:1px solid #b0d8bc';
+      sw.innerHTML = `<div style="font-size:11px;color:var(--green);text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">Strengths</div>${fb.strengths.map(s=>`<div style="font-size:13px;color:var(--green);margin-bottom:3px">✓ ${s}</div>`).join('')}`;
+      container.appendChild(sw);
+    }
+
+    if (fb.tip) { const tip=div(''); tip.style.cssText='font-size:13px;color:var(--blue);font-style:italic;background:var(--blueBg);padding:8px 12px;border-radius:8px'; tip.textContent=`📌 ${fb.tip}`; container.appendChild(tip); }
+
+    const btns = div('flex gap-10 wrap');
+    btns.appendChild(btn('btn-purple','New Conversation',()=>renderMode('conversation')));
+    btns.appendChild(btn('btn-secondary','Back to Home',()=>showOnly('screen-home')));
+    container.appendChild(btns);
+  }
+
+  // Start with opening message
+  (async () => {
+    setStatus('thinking');
+    try {
+      const opening = await callClaude([{role:'user',content:`Start a natural French conversation on: "${topic}". Open with a warm question or observation in French. 1-2 sentences only.`}], convSystem(topic), 200);
+      addMessage('assistant', opening);
+      await playTTS(opening);
+    } catch(e) { errDiv.textContent = '⚠ ' + e.message; setStatus('idle'); }
+  })();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════
+function init() {
+  renderLevelBtns();
+
+  el('settings-btn').onclick = () => {
+    renderSettings();
+    showOnly('screen-settings');
+  };
+
+  if (!STATE.anthropicKey || !STATE.anthropicKey.startsWith('sk-')) {
+    renderSetup();
+  } else {
+    renderHome();
+    showOnly('screen-home');
+  }
+
+  // Register service worker
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(()=>{});
+  }
+}
+
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
